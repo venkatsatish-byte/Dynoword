@@ -3,6 +3,8 @@
 An independent, open-source word processor that runs in any modern browser and installs like a native app on
 **Windows, macOS, iPhone, iPad and Android**. Works offline; documents are stored privately on the device.
 
+**Use it now: https://dynoword.netlify.app/**
+
 ## Features
 
 **Home** – cut/copy/paste, format painter, 15 fonts, font sizes, grow/shrink, bold, italic, underline,
@@ -35,6 +37,8 @@ L/E/R/J, Ctrl+Enter for page break, Ctrl+Alt+1–3 for headings, Ctrl+]/[ for fo
 
 ## Install on a device
 
+Open **https://dynoword.netlify.app/**, then:
+
 | Device | How |
 | --- | --- |
 | Windows / Mac (Edge or Chrome) | Open the site → click **Install** in the address bar |
@@ -55,7 +59,7 @@ Built with [Tiptap](https://tiptap.dev) (ProseMirror), [docx](https://docx.js.or
 
 ## Deploy
 
-The site is hosted on [Netlify](https://www.netlify.com), configured by `netlify.toml`
+The site is hosted on [Netlify](https://www.netlify.com) at https://dynoword.netlify.app/, configured by `netlify.toml`
 (build command `npm run build`, publish directory `dist`). Every push to `main` redeploys
 automatically, and installed copies of the app update the next time they open online.
 
