@@ -8,7 +8,7 @@ function serviceWorker() {
     apply: 'build',
     generateBundle(_, bundle) {
       const assets = Object.keys(bundle).filter((f) => !f.endsWith('.map'));
-      const statics = ['./', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
+      const statics = ['./', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'];
       const version = Date.now().toString(36);
       const source = readFileSync('src/sw-template.js', 'utf8')
         .replace('__VERSION__', version)
