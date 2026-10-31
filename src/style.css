@@ -471,6 +471,8 @@ select {
 .export-list b { display: block; }
 .export-list span { font-size: 12px; color: var(--muted); }
 .about-list li { margin-bottom: 8px; }
+.legal-links { margin: 18px 0 0; font-size: 13px; }
+.legal-links a, .tiny a, dialog a { color: var(--accent); }
 .kbd-table td { padding: 4px 16px 4px 0; }
 .kbd-table td:first-child { font-family: ui-monospace, Menlo, "DejaVu Sans Mono", "Courier New", monospace; font-size: 13px; color: var(--accent); }
 

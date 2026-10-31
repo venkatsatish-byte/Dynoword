@@ -1404,7 +1404,9 @@ async function promptUpgrade() {
   const lapsed = a.status === 'active';
   const body = await dialog(lapsed ? 'Your subscription has ended' : 'Your free trial has ended', `
     <p>Your documents are read-only. You can still open, read, print, export and share them.</p>
-    <p>Subscribe for <b>${billing.PRICE}</b> to keep editing on all your devices. Cancel any time.</p>`, { okText: `Subscribe — ${billing.PRICE}` });
+    <p>Subscribe for <b>${billing.PRICE}</b> to keep editing on all your devices. Cancel any time.</p>
+    <p class="muted tiny">See our <a href="legal/terms.html" target="_blank" rel="noopener">Terms</a> and
+      <a href="legal/refunds.html" target="_blank" rel="noopener">Refund policy</a>.</p>`, { okText: `Subscribe — ${billing.PRICE}` });
   if (body) billingAction(billing.subscribe);
 }
 
@@ -1500,6 +1502,9 @@ function renderAccount() {
       <form class="signin-form" id="signinForm">
         <label class="field">Email address <input type="email" name="email" required autocomplete="email" inputmode="email" placeholder="you@example.com"></label>
         <button class="primary-btn" type="submit">Email me a sign-in link</button>
+        <p class="muted tiny">By signing in you agree to the
+          <a href="legal/terms.html" target="_blank" rel="noopener">Terms of Service</a> and
+          <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
       </form>
       <div class="signin-sent hidden" id="signinSent">
         <p><b>Check your email.</b> Open the link we sent on this device to finish signing in.</p>
@@ -1527,7 +1532,10 @@ function renderAccount() {
         : `<button class="primary-btn" data-cmd="subscribe">Subscribe — ${billing.PRICE}</button>`}
       <button class="txt-btn" data-cmd="signOut">Sign out</button>
     </div>
-    <p class="muted tiny">Payments are handled securely by Stripe. Cancel any time from Manage billing.</p>`;
+    <p class="muted tiny">Payments are handled securely by Stripe. Cancel any time from Manage billing.
+      <a href="legal/terms.html" target="_blank" rel="noopener">Terms</a> ·
+      <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy</a> ·
+      <a href="legal/refunds.html" target="_blank" rel="noopener">Refunds</a></p>`;
 }
 
 $('#hub').addEventListener('submit', async (e) => {

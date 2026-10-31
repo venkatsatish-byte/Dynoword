@@ -37,3 +37,19 @@
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Short addresses for the policy pages (handy for Stripe's public business settings).
+[[redirects]]
+  from = "/terms"
+  to = "/legal/terms.html"
+  status = 301
+
+[[redirects]]
+  from = "/privacy"
+  to = "/legal/privacy.html"
+  status = 301
+
+[[redirects]]
+  from = "/refunds"
+  to = "/legal/refunds.html"
+  status = 301
