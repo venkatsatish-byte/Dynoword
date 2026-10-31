@@ -4,11 +4,41 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 const BLOCK_TYPES = ['paragraph', 'heading'];
 
-/** Paragraph-level formatting: line spacing and left indent, as in any desktop word processor. */
+/** Converts a CSS length (in, cm, mm, pt, px) to inches. */
+export function toInches(value) {
+  if (!value) return 0;
+  const n = parseFloat(value);
+  if (Number.isNaN(n)) return 0;
+  if (value.endsWith('cm')) return n / 2.54;
+  if (value.endsWith('mm')) return n / 25.4;
+  if (value.endsWith('pt')) return n / 72;
+  if (value.endsWith('in')) return n;
+  return n / 96;
+}
+
+const round = (n, step = 1 / 64) => Math.round(n / step) * step;
+const toPoints = (value) => (value ? Math.round(toInches(value) * 72 * 2) / 2 : null);
+
+// Left padding is added by the leftIndent renderer so it can combine with hanging indents.
+export const BORDERS = {
+  bottom: 'border-bottom: 0.75pt solid currentColor; padding-bottom: 2pt',
+  top: 'border-top: 0.75pt solid currentColor; padding-top: 2pt',
+  topbottom: 'border-top: 0.75pt solid currentColor; border-bottom: 0.75pt solid currentColor; padding-top: 2pt; padding-bottom: 2pt',
+  left: 'border-left: 2.25pt solid currentColor',
+  box: 'border: 0.75pt solid currentColor; padding-top: 2pt; padding-bottom: 2pt; padding-right: 4pt',
+};
+const BORDER_PAD_LEFT = { left: '6pt', box: '4pt' };
+
+/**
+ * Paragraph-level formatting, as in any desktop word processor: indents (left, right, first-line
+ * or hanging), spacing before/after, line spacing, borders, shading and custom tab stops.
+ * Lengths are stored in inches and spacing in points.
+ */
 export const ParagraphFormat = Extension.create({
   name: 'paragraphFormat',
 
   addGlobalAttributes() {
+    const css = (style) => ({ style });
     return [
       {
         types: BLOCK_TYPES,
@@ -16,16 +46,68 @@ export const ParagraphFormat = Extension.create({
           lineHeight: {
             default: null,
             parseHTML: (el) => el.style.lineHeight || null,
-            renderHTML: (attrs) => (attrs.lineHeight ? { style: `line-height: ${attrs.lineHeight}` } : {}),
+            renderHTML: (a) => (a.lineHeight ? css(`line-height: ${a.lineHeight}`) : {}),
           },
-          indent: {
+          leftIndent: {
             default: 0,
-            parseHTML: (el) => {
-              const ml = parseFloat(el.style.marginLeft) || 0;
-              const unit = el.style.marginLeft.endsWith('in') ? 1 : 1 / 48;
-              return Math.max(0, Math.min(8, Math.round(ml * unit * 2)));
+            parseHTML: (el) => (el.dataset.left ? +el.dataset.left : round(Math.max(0, toInches(el.style.marginLeft)))),
+            // A hanging first line starts left of the body text, so the box (border, shading) starts there too:
+            // margin = left + firstLine, padding = -firstLine, text-indent = firstLine.
+            renderHTML: (a) => {
+              const left = a.leftIndent || 0;
+              const first = a.firstLine || 0;
+              const borderPad = BORDER_PAD_LEFT[a.border];
+              const out = {};
+              const styles = [];
+              if (first < 0) {
+                styles.push(`margin-left: ${+(left + first).toFixed(4)}in`);
+                styles.push(`padding-left: ${borderPad ? `calc(${-first}in + ${borderPad})` : `${-first}in`}`);
+                out['data-left'] = left;
+                out['data-first'] = first;
+              } else {
+                if (left) styles.push(`margin-left: ${left}in`);
+                if (borderPad) styles.push(`padding-left: ${borderPad}`);
+              }
+              if (styles.length) out.style = styles.join('; ');
+              return out;
             },
-            renderHTML: (attrs) => (attrs.indent ? { style: `margin-left: ${attrs.indent * 0.5}in` } : {}),
+          },
+          rightIndent: {
+            default: 0,
+            parseHTML: (el) => round(Math.max(0, toInches(el.style.marginRight))),
+            renderHTML: (a) => (a.rightIndent ? css(`margin-right: ${a.rightIndent}in`) : {}),
+          },
+          firstLine: {
+            default: 0,
+            parseHTML: (el) => (el.dataset.first ? +el.dataset.first : round(toInches(el.style.textIndent))),
+            renderHTML: (a) => (a.firstLine ? css(`text-indent: ${a.firstLine}in`) : {}),
+          },
+          spaceBefore: {
+            default: null,
+            parseHTML: (el) => toPoints(el.style.marginTop),
+            renderHTML: (a) => (a.spaceBefore != null ? css(`margin-top: ${a.spaceBefore}pt`) : {}),
+          },
+          spaceAfter: {
+            default: null,
+            parseHTML: (el) => toPoints(el.style.marginBottom),
+            renderHTML: (a) => (a.spaceAfter != null ? css(`margin-bottom: ${a.spaceAfter}pt`) : {}),
+          },
+          border: {
+            default: null,
+            parseHTML: (el) => (BORDERS[el.dataset.border] ? el.dataset.border : null),
+            renderHTML: (a) => (BORDERS[a.border] ? { 'data-border': a.border, style: BORDERS[a.border] } : {}),
+          },
+          shading: {
+            default: null,
+            parseHTML: (el) => el.dataset.shading || null,
+            renderHTML: (a) => (a.shading ? { 'data-shading': a.shading, style: `background-color: ${a.shading}` } : {}),
+          },
+          tabStops: {
+            default: null,
+            parseHTML: (el) => {
+              try { return el.dataset.tabs ? JSON.parse(el.dataset.tabs) : null; } catch { return null; }
+            },
+            renderHTML: (a) => (a.tabStops?.length ? { 'data-tabs': JSON.stringify(a.tabStops) } : {}),
           },
         },
       },
@@ -58,22 +140,50 @@ export const ParagraphFormat = Extension.create({
       if (changed && dispatch) dispatch(tr);
       return changed;
     };
+    const step = 0.5;
     return {
       setLineSpacing: (value) => update(() => ({ lineHeight: value })),
-      increaseIndent: () => update((a) => (a.indent < 8 ? { indent: a.indent + 1 } : null)),
-      decreaseIndent: () => update((a) => (a.indent > 0 ? { indent: a.indent - 1 } : null)),
+      setParagraphFormat: (attrs) => update((a) => (typeof attrs === 'function' ? attrs(a) : attrs)),
+      increaseIndent: () => update((a) => (a.leftIndent < 6 ? { leftIndent: (Math.floor(a.leftIndent / step + 1e-6) + 1) * step } : null)),
+      decreaseIndent: () => update((a) => (a.leftIndent > 0 ? { leftIndent: Math.max(0, (Math.ceil(a.leftIndent / step - 1e-6) - 1) * step) } : null)),
     };
   },
 
   addKeyboardShortcuts() {
-    const indent = (dir) => () => {
-      const ed = this.editor;
-      if (ed.isActive('listItem')) return dir > 0 ? ed.commands.sinkListItem('listItem') : ed.commands.liftListItem('listItem');
-      if (ed.isActive('taskItem')) return dir > 0 ? ed.commands.sinkListItem('taskItem') : ed.commands.liftListItem('taskItem');
-      if (ed.isActive('table') || ed.isActive('codeBlock')) return false;
-      return dir > 0 ? ed.commands.increaseIndent() : ed.commands.decreaseIndent();
+    const ed = () => this.editor;
+    const inList = () => ['listItem', 'taskItem'].find((t) => ed().isActive(t));
+    return {
+      Tab: () => {
+        const list = inList();
+        if (list) return ed().commands.sinkListItem(list);
+        if (ed().isActive('table') || ed().isActive('codeBlock')) return false;
+        return ed().commands.insertContent({ type: 'tab' });
+      },
+      'Shift-Tab': () => {
+        const list = inList();
+        if (list) return ed().commands.liftListItem(list);
+        if (ed().isActive('table') || ed().isActive('codeBlock')) return false;
+        return ed().commands.decreaseIndent();
+      },
     };
-    return { Tab: indent(1), 'Shift-Tab': indent(-1) };
+  },
+});
+
+/** A tab character. Its width is laid out to the next tab stop by the app (see layoutTabs). */
+export const Tab = Node.create({
+  name: 'tab',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  selectable: false,
+  parseHTML() {
+    return [{ tag: 'span[data-tab]' }, { tag: 'span[style*="mso-tab-count"]' }];
+  },
+  renderHTML() {
+    return ['span', { 'data-tab': '', class: 'tab' }, '\t'];
+  },
+  renderText() {
+    return '\t';
   },
 });
 

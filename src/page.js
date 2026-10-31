@@ -21,4 +21,5 @@ export const DEFAULT_SETTINGS = {
   header: '',
   footer: '',
   pageNumbers: false,
+  pageColor: null,
 };

@@ -16,7 +16,15 @@ style gallery (Normal, Title, Heading 1–3, Quote, Code), find & replace (match
 lines, links, comments, header, footer, page numbers, date & time, symbols, code blocks.
 
 **Layout** – margins (normal / narrow / moderate / wide), portrait / landscape, Letter / Legal / A4 / A5,
-1–3 columns.
+1–3 columns, page colour, left/right indent and spacing before/after spinners, and a Paragraph dialog
+(alignment, indents, first-line or hanging indent, spacing, line spacing, tab stops).
+
+**Ruler** – drag the first-line, hanging, left and right indent markers; click to add left, center or
+right tab stops, drag them to move, or drag them off the ruler to remove. Tab characters line up to
+custom stops or the default ½-inch stops. Shows inches or centimetres depending on your region.
+
+**Paragraph borders & shading** – bottom, top, top-and-bottom, left bar or box borders, and background
+shading colours.
 
 **Review** – spelling check toggle, word count, read aloud, dictation (where the browser supports it),
 comments pane with resolve.
