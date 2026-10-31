@@ -37,6 +37,32 @@ export const TEMPLATES = {
       <p>Skill · Skill · Skill · Skill · Skill</p>`,
   },
 
+  atsResume: {
+    title: 'ATS Resume',
+    html: () => `
+      <h1 class="doc-title">First Last</h1>
+      <p>City, State · (555) 555-5555 · first.last@example.com · linkedin.com/in/firstlast</p>
+      <h2>Professional Summary</h2>
+      <p>Results-driven [job title] with [X] years of experience in [field]. Skilled in [skill], [skill] and [skill]. Known for [a measurable achievement]. Use words from the job posting where they truly apply.</p>
+      <h2>Skills</h2>
+      <ul><li><p>Skill, Skill, Skill, Skill</p></li><li><p>Tool, Tool, Tool, Tool</p></li><li><p>Certification or language</p></li></ul>
+      <h2>Work Experience</h2>
+      <h3>Job Title</h3>
+      <p><strong>Company Name</strong> — City, State | Jan 2021 – Present</p>
+      <ul>
+        <li><p>Start with an action verb and end with a result, e.g. “Cut processing time 30% by automating …”.</p></li>
+        <li><p>Quantify impact: revenue, savings, percentages, people, time.</p></li>
+        <li><p>Mirror important keywords from the job description.</p></li>
+      </ul>
+      <h3>Job Title</h3>
+      <p><strong>Company Name</strong> — City, State | Jun 2018 – Dec 2020</p>
+      <ul><li><p>Achievement with a measurable result.</p></li><li><p>Achievement with a measurable result.</p></li></ul>
+      <h2>Education</h2>
+      <p><strong>Degree, Field of Study</strong> — University Name, City, State | 2018</p>
+      <h2>Certifications</h2>
+      <ul><li><p>Certification Name — Issuing Organization, 2022</p></li></ul>`,
+  },
+
   report: {
     title: 'Report',
     html: () => `

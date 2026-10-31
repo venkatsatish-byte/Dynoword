@@ -19,6 +19,7 @@ import { PAGE_SIZES, MARGINS, DEFAULT_SETTINGS } from './page.js';
 import { saveDoc, getDoc, listDocs, deleteDoc, newId } from './storage.js';
 import { readFile, download, safeFilename, standaloneHtml, htmlToMarkdown } from './io.js';
 import { TEMPLATES } from './templates.js';
+import { analyze, matchKeywords, cleanJson, headerParagraphs, insertAfterName, atsDocument } from './ats.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -89,7 +90,7 @@ const editor = new Editor({
       return insertImageFiles(files);
     },
   },
-  onUpdate: () => { scheduleSave(); scheduleLayout(); refreshNav(); refreshComments(); },
+  onUpdate: () => { scheduleSave(); scheduleLayout(); refreshNav(); refreshComments(); scheduleAts(); },
   onSelectionUpdate: () => updateToolbar(),
   onTransaction: () => { updateToolbar(); scheduleTabs(); },
 });
@@ -257,6 +258,7 @@ const commands = {
   link: linkDialog,
   comment: commentDialog,
   showComments: () => togglePane('commentsPane'),
+  atsPane: () => togglePane('atsPane'),
   navPane: () => togglePane('navPane'),
   dateTime: dateDialog,
   symbol: symbolDialog,
@@ -432,6 +434,7 @@ function updateToolbar() {
       reading: speechSynthesis?.speaking,
       dictating: !!state.dictation,
       commentsPane: !$('#commentsPane').classList.contains('hidden'),
+      atsPane: !$('#atsPane').classList.contains('hidden'),
       navPane: !$('#navPane').classList.contains('hidden'),
       printLayout: state.layout === 'print',
       webLayout: state.layout === 'web',
@@ -782,6 +785,7 @@ function togglePane(id) {
   }
   refreshNav();
   refreshComments();
+  refreshAts();
   updateToolbar();
 }
 function showPane(id) { if (document.getElementById(id).classList.contains('hidden')) togglePane(id); }
@@ -836,6 +840,87 @@ $('#commentList').addEventListener('click', (e) => {
   if (!card) return;
   if (e.target.closest('[data-act=resolve]')) { editor.commands.removeComment(card.dataset.id); return; }
   chain().setTextSelection({ from: +card.dataset.from, to: +card.dataset.to }).scrollIntoView().run();
+});
+
+// ---------- ATS (applicant tracking system) check ----------
+
+const ATS_LEVELS = { fail: 'Problem', warn: 'Improve', info: 'Tip', pass: 'Good' };
+let atsTimer = 0;
+function scheduleAts() {
+  clearTimeout(atsTimer);
+  atsTimer = setTimeout(refreshAts, 400);
+}
+
+function refreshAts() {
+  if ($('#atsPane').classList.contains('hidden') || !state.doc) return;
+  const result = analyze(editor.state.doc, state.doc.settings, { pageCount: state.pageCount || 1 });
+  state.ats = result;
+  const { score, checks } = result;
+  const verdict = score >= 85 ? 'Ready for ATS' : score >= 65 ? 'Mostly readable' : 'Needs work';
+  const ring = $('#atsRing');
+  ring.style.setProperty('--p', score);
+  ring.dataset.level = score >= 85 ? 'good' : score >= 65 ? 'ok' : 'bad';
+  $('#atsScore').textContent = score;
+  $('#atsVerdict').textContent = verdict;
+  $('#atsList').innerHTML = checks.map((c, i) => `
+    <li class="ats-item ${c.level}">
+      <div class="ats-row"><span class="ats-badge">${ATS_LEVELS[c.level]}</span><b>${escapeHtml(c.title)}</b></div>
+      ${c.level === 'pass' ? '' : `<p>${escapeHtml(c.detail)}</p>`}
+      ${c.fix || c.range ? `<div class="ats-actions">
+        ${c.range ? `<button class="txt-btn sm" data-ats-show="${i}">Show</button>` : ''}
+        ${c.fix ? `<button class="txt-btn sm primary" data-ats-fix="${i}">Fix</button>` : ''}</div>` : ''}
+    </li>`).join('');
+  refreshKeywords();
+}
+
+function refreshKeywords() {
+  const jd = $('#jdInput').value.trim();
+  const out = $('#jdResult');
+  if (!jd) { out.innerHTML = '<p class="muted">Paste a job posting to see which of its keywords your résumé already uses.</p>'; return; }
+  const { score, matched, missing } = matchKeywords(editor.getText(), jd);
+  const chips = (list, cls) => list.map((k) => `<span class="chip ${cls}">${escapeHtml(k)}</span>`).join('');
+  out.innerHTML = `
+    <div class="jd-score"><b>${score}%</b> keyword match <span class="muted">(${matched.length} of ${matched.length + missing.length})</span></div>
+    <div class="jd-bar"><span style="width:${score}%"></span></div>
+    ${missing.length ? `<h5>Missing — add where they truly apply</h5><div class="chips">${chips(missing, 'miss')}</div>` : ''}
+    ${matched.length ? `<h5>Already in your résumé</h5><div class="chips">${chips(matched, 'hit')}</div>` : ''}`;
+}
+
+let jdTimer = 0;
+$('#jdInput').addEventListener('input', () => {
+  clearTimeout(jdTimer);
+  jdTimer = setTimeout(() => {
+    if (state.doc) { state.doc.jobDescription = $('#jdInput').value; scheduleSave(); }
+    refreshKeywords();
+  }, 300);
+});
+
+function replaceDocJson(json) {
+  editor.chain().setContent(json).focus('start').run();
+}
+
+function applyAtsFix(check) {
+  const json = editor.getJSON();
+  switch (check.fix) {
+    case 'columns': updateSettings({ columns: 1 }); break;
+    case 'pageColor': updateSettings({ pageColor: null }); break;
+    case 'moveHeader': {
+      replaceDocJson(insertAfterName(json, headerParagraphs(state.doc.settings)));
+      updateSettings({ header: '', footer: '' });
+      break;
+    }
+    default:
+      replaceDocJson(cleanJson(json, new Set([check.fix]), { headingTexts: check.texts || [] }));
+  }
+  toast('Fixed');
+  refreshAts();
+}
+
+$('#atsList').addEventListener('click', (e) => {
+  const show = e.target.closest('[data-ats-show]');
+  const fix = e.target.closest('[data-ats-fix]');
+  if (show) chain().setTextSelection(state.ats.checks[+show.dataset.atsShow].range).scrollIntoView().run();
+  else if (fix) applyAtsFix(state.ats.checks[+fix.dataset.atsFix]);
 });
 
 // ---------- Page layout ----------
@@ -1125,6 +1210,8 @@ function loadIntoEditor(doc) {
   if (doc.content) migrateIndent(doc.content);
   editor.commands.setContent(doc.content || doc.html || '<p></p>', { emitUpdate: false });
   editor.commands.setSearchTerm('');
+  $('#jdInput').value = doc.jobDescription || '';
+  scheduleAts();
   applySettings();
   refreshNav();
   refreshComments();
@@ -1174,6 +1261,12 @@ async function exportBlob(kind) {
       const { exportDocx } = await import('./docx-export.js');
       return new Blob([await exportDocx(editor.getJSON(), s)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
     }
+    case 'ats': {
+      const { exportDocx } = await import('./docx-export.js');
+      const headings = analyze(editor.state.doc, s).checks.find((c) => c.fix === 'headings')?.texts || [];
+      const ats = atsDocument(editor.getJSON(), s, headings);
+      return new Blob([await exportDocx(ats.json, ats.settings)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    }
     case 'html': return new Blob([standaloneHtml(title, editor.getHTML(), s)], { type: 'text/html' });
     case 'md': return new Blob([htmlToMarkdown(editor.getHTML())], { type: 'text/markdown' });
     default: return new Blob([editor.getText({ blockSeparator: '\n\n' })], { type: 'text/plain' });
@@ -1183,8 +1276,9 @@ async function exportBlob(kind) {
 async function exportAs(kind) {
   try {
     const blob = await exportBlob(kind);
-    download(blob, `${safeFilename($('#docTitle').value)}.${kind}`);
-    toast(`Downloaded ${kind.toUpperCase()}`);
+    const name = safeFilename($('#docTitle').value);
+    download(blob, kind === 'ats' ? `${/\bATS\b/i.test(name) ? name : `${name} (ATS)`}.docx` : `${name}.${kind}`);
+    toast(kind === 'ats' ? 'Downloaded ATS-ready .docx' : `Downloaded ${kind.toUpperCase()}`);
   } catch (e) {
     console.error(e);
     toast('Export failed');

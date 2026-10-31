@@ -348,6 +348,49 @@ select {
 .nav-item.lvl-2 { padding-left: 24px; }
 .nav-item.lvl-3 { padding-left: 38px; font-size: 13px; }
 .nav-item.lvl-4, .nav-item.lvl-5, .nav-item.lvl-6 { padding-left: 52px; font-size: 13px; color: var(--muted); }
+/* ATS pane */
+.ats-pane { width: 320px; }
+.ats-pane .pane-body { padding: 12px 14px 24px; }
+.ats-pane h4 { margin: 18px 0 8px; font-size: 13px; }
+.ats-pane h5 { margin: 12px 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.ats-score { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.ats-score small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.ats-ring {
+  --p: 0; --c: #dc2626; flex: none; width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
+  background: conic-gradient(var(--c) calc(var(--p) * 1%), color-mix(in srgb, var(--muted) 20%, transparent) 0);
+}
+.ats-ring[data-level="ok"] { --c: #d97706; }
+.ats-ring[data-level="good"] { --c: #059669; }
+.ats-ring span { width: 50px; height: 50px; border-radius: 50%; background: var(--chrome); display: grid; place-items: center; font-size: 18px; font-weight: 700; }
+.primary-btn.full { width: 100%; justify-content: center; }
+.tiny { font-size: 11px; margin: 6px 0 0; }
+.ats-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ats-item { border: 1px solid var(--border); border-left-width: 3px; border-radius: 6px; padding: 8px 10px; background: var(--chrome-2); font-size: 13px; }
+.ats-item p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.ats-item.fail { border-left-color: #dc2626; }
+.ats-item.warn { border-left-color: #d97706; }
+.ats-item.info { border-left-color: #0284c7; }
+.ats-item.pass { border-left-color: #059669; }
+.ats-row { display: flex; align-items: baseline; gap: 6px; }
+.ats-badge { flex: none; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; padding: 1px 6px; border-radius: 99px; color: #fff; }
+.fail .ats-badge { background: #dc2626; }
+.warn .ats-badge { background: #d97706; }
+.info .ats-badge { background: #0284c7; }
+.pass .ats-badge { background: #059669; }
+.ats-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+.txt-btn.primary { background: var(--accent) !important; color: #fff; border-color: var(--accent) !important; }
+#jdInput { width: 100%; border: 1px solid var(--border); border-radius: 6px; background: var(--chrome-2); color: var(--text); padding: 8px; font-size: 14px; resize: vertical; }
+#jdInput:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+#jdResult { margin-top: 10px; font-size: 13px; }
+.jd-score b { font-size: 20px; color: var(--accent); }
+.jd-bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--muted) 20%, transparent); margin: 6px 0 4px; overflow: hidden; }
+.jd-bar span { display: block; height: 100%; background: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--border); }
+.chip.miss { background: color-mix(in srgb, #d97706 14%, transparent); border-color: color-mix(in srgb, #d97706 45%, transparent); }
+.chip.hit { background: color-mix(in srgb, #059669 14%, transparent); border-color: color-mix(in srgb, #059669 45%, transparent); }
+.tpl-thumb.ats::after { content: "ATS"; position: absolute; right: 8px; bottom: 8px; font: 700 11px system-ui, sans-serif; color: #fff; background: #0f766e; padding: 2px 6px; border-radius: 4px; }
+
 .comment-card { border: 1px solid var(--border); border-left: 3px solid #f2c94c; border-radius: 6px; padding: 10px; margin-bottom: 8px; cursor: pointer; background: var(--chrome-2); }
 .comment-card:hover { border-color: var(--accent); border-left-color: #f2c94c; }
 .cc-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
