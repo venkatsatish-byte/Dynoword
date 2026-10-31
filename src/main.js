@@ -15,6 +15,7 @@ import { icons } from './icons.js';
 
 import { ParagraphFormat, Tab, PageBreak, Comment, Search, WordShortcuts } from './extensions.js';
 import { createRuler, layoutTabs, toDisplay, fromDisplay, UNIT } from './ruler.js';
+import { Pagination, measureBreaks, applyBreaks } from './pagination.js';
 import { PAGE_SIZES, MARGINS, DEFAULT_SETTINGS } from './page.js';
 import { saveDoc, getDoc, listDocs, deleteDoc, newId } from './storage.js';
 import { readFile, download, safeFilename, standaloneHtml, htmlToMarkdown } from './io.js';
@@ -74,6 +75,7 @@ const editor = new Editor({
     Placeholder.configure({ placeholder: ({ editor: ed }) => (ed.isEmpty ? 'Start typing…' : '') }),
     ParagraphFormat,
     Tab,
+    Pagination,
     PageBreak,
     Comment,
     Search,
@@ -996,8 +998,17 @@ function updateSettings(patch) {
   el.addEventListener('input', () => {
     state.doc.settings[id === 'pageHeader' ? 'header' : 'footer'] = el.innerText.replace(/\n$/, '');
     scheduleSave();
+    scheduleLayout();
   });
   el.addEventListener('blur', applySettings);
+});
+
+// Clicking the header or footer shown on any page edits the document's header or footer.
+editor.view.dom.addEventListener('mousedown', (e) => {
+  const part = e.target.closest?.('.pg-head, .pg-foot');
+  if (!part) return;
+  e.preventDefault();
+  (part.classList.contains('pg-head') ? $('#pageHeader') : $('#footerText')).focus();
 });
 
 let layoutRaf = 0;
@@ -1012,18 +1023,49 @@ function scheduleTabs() {
   tabsRaf = requestAnimationFrame(() => layoutTabs(editor.view.dom));
 }
 
-// Estimate where printed pages begin and mark them on the continuous sheet.
+const PAGE_GAP = 24; // px between pages in print layout
+
+// Lays the document out as separate pages: each page ends with its footer, a gap, and the next page's header.
 function paginate() {
-  const dom = editor.view.dom;
+  const view = editor.view;
+  const dom = view.dom;
   const markers = $('#pageMarkers') || Object.assign(document.createElement('div'), { id: 'pageMarkers', className: 'page-markers' });
   if (!markers.parentNode) pageEl.appendChild(markers);
   markers.innerHTML = '';
-  if (state.layout !== 'print' || !state.doc) { state.pageCount = 1; updatePageStatus(); return; }
+  if (view.composing) { scheduleLayout(); return; }
+  if (state.layout !== 'print' || !state.doc) {
+    applyBreaks(view, [], null);
+    state.pageCount = 1;
+    pageEl.style.setProperty('--pages', 1);
+    updatePageStatus();
+    return;
+  }
 
   const s = state.doc.settings;
   const size = PAGE_SIZES[s.pageSize] || PAGE_SIZES.letter;
   const m = MARGINS[s.margins] || MARGINS.normal;
   const h = s.orientation === 'landscape' ? size.w : size.h;
+  if ((s.columns || 1) === 1) {
+    const geometry = { contentH: (h - m.top - m.bottom) * 96 };
+    let breaks = [];
+    // Inserting spacers can shift margins slightly, so measure again until the layout settles.
+    for (let pass = 0; pass < 3; pass++) {
+      breaks = measureBreaks(view, geometry);
+      const info = {
+        mT: m.top * 96, mB: m.bottom * 96, gap: PAGE_GAP, total: breaks.length + 1,
+        header: s.header || '', footer: s.footer || '', pageNumbers: !!s.pageNumbers,
+      };
+      if (!applyBreaks(view, breaks, info)) break;
+    }
+    state.pageStarts = null;
+    state.pageCount = breaks.length + 1;
+    pageEl.style.setProperty('--pages', state.pageCount);
+    updatePageStatus();
+    return;
+  }
+
+  // Multi-column layout: keep one continuous sheet and mark where printed pages would begin.
+  applyBreaks(view, [], null);
   const perPage = (h - m.top - m.bottom) * 96 * (s.columns || 1);
   const top0 = dom.offsetTop;
   const starts = [0];
@@ -1052,6 +1094,17 @@ function paginate() {
 }
 
 function updateCurrentPage() {
+  const spacers = editor.view.dom.querySelectorAll('.pg-spacer');
+  if (spacers.length) {
+    try {
+      const caret = editor.view.coordsAtPos(editor.state.selection.from).top;
+      let p = 1;
+      spacers.forEach((sp) => { if (sp.getBoundingClientRect().bottom <= caret + 1) p++; });
+      state.currentPage = p;
+    } catch { state.currentPage = 1; }
+    updatePageStatus();
+    return;
+  }
   if (!state.pageStarts) return;
   try {
     const coords = editor.view.coordsAtPos(editor.state.selection.from);
