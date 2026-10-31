@@ -237,6 +237,27 @@ select {
   color: var(--muted); font-size: 10pt; line-height: 1.3; text-align: center;
 }
 .page-header, .footer-text { white-space: pre-wrap; }
+
+/* Page-by-page view: each page break shows that page's footer, a gap, then the next page's header. */
+.page { --pg-gap: 24px; min-height: calc(var(--page-h) * var(--pages, 1) + var(--pg-gap) * (var(--pages, 1) - 1)); }
+.pg-spacer { display: block; position: static; text-indent: 0; user-select: none; -webkit-user-select: none; }
+/* Positioned against the editor (the page's text area), so widen it by the side margins to span the sheet. */
+.pg-sheet { position: absolute; left: calc(-1 * var(--m-left)); right: calc(-1 * var(--m-right)); display: block; pointer-events: none; }
+.pg-foot, .pg-head {
+  display: flex; flex-direction: column; align-items: center; box-sizing: border-box; padding: 0 var(--m-right) 0 var(--m-left);
+  color: var(--muted); font: 400 10pt/1.3 system-ui, -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-style: normal; letter-spacing: normal; text-align: center; text-decoration: none;
+}
+.pg-foot { justify-content: flex-end; padding-bottom: var(--hf-bottom); }
+.pg-head { justify-content: flex-start; padding-top: var(--hf-top); }
+.pg-text { white-space: pre-wrap; pointer-events: auto; cursor: text; min-height: 1.3em; }
+.pg-num { margin-top: 2px; }
+.pg-gap { display: block; position: relative; margin: 0 -14px; background: var(--canvas); }
+/* Soft shadow under the page above and over the page below, only as wide as the sheet. */
+.pg-gap::before, .pg-gap::after { content: ""; position: absolute; left: 14px; right: 14px; height: 7px; }
+.pg-gap::before { top: 0; background: linear-gradient(rgba(15, 23, 42, .14), transparent); }
+.pg-gap::after { bottom: 0; background: linear-gradient(transparent, rgba(15, 23, 42, .08)); }
+.web-layout .pg-spacer { display: none; }
 .page-header { top: var(--hf-top); }
 .page-footer { bottom: var(--hf-bottom); }
 .page-header, .footer-text { min-height: 1.3em; outline: none; border-radius: 2px; }
@@ -601,7 +622,7 @@ dialog { max-height: calc(100dvh - 32px); overflow: auto; }
   html, body { height: auto; overflow: visible; background: #fff; }
   .titlebar, .ribbon-tabs, .ribbon, .findbar, .statusbar, .side-pane, .hub, .toast, dialog, .page-markers, .page-header, .page-footer { display: none !important; }
   #app, .workspace, .canvas, .zoomer { display: block; height: auto; overflow: visible; padding: 0; margin: 0; background: #fff; zoom: 1 !important; width: auto; }
-  .page { width: auto; min-height: 0; padding: 0; box-shadow: none; background: #fff; color: #000; display: block; }
+  .page { width: auto; min-height: 0 !important; padding: 0; box-shadow: none; background: #fff; color: #000; display: block; }
   .page.has-page-color { background: var(--page-bg); color: var(--page-text); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .page.has-page-color .doc-body { color: inherit; }
   .ruler, .ruler-guide { display: none !important; }
@@ -611,6 +632,7 @@ dialog { max-height: calc(100dvh - 32px); overflow: auto; }
   .doc-body h1.doc-title { color: #000; }
   .doc-body a { color: #0e7490; }
   .doc-body tr, .doc-body img { break-inside: avoid; }
+  .pg-spacer { display: none !important; }
   .page-break { border: 0; margin: 0; break-after: page; }
   .page-break::after { display: none; }
   .search-hit { background: none !important; }
