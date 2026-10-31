@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Dynoword</title>
+  <meta name="description" content="Dynoword — a fast, offline-ready word processor for Windows, macOS, iPhone, iPad and Android." />
+  <meta name="theme-color" content="#0f766e" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Dynoword" />
+  <script>
+    try { const t = localStorage.getItem('dw-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <div id="app">
+    <!-- Title bar -->
+    <header class="titlebar">
+      <div class="brand"><img src="icons/icon.svg" alt="" width="22" height="22" /><span>Dynoword</span></div>
+      <input id="docTitle" class="doc-title" value="Untitled document" aria-label="Document title" spellcheck="false" />
+      <span id="saveState" class="save-state" aria-live="polite">Saved</span>
+      <div class="titlebar-actions">
+        <button class="icon-btn" data-cmd="undo" title="Undo (Ctrl+Z)"><i data-lucide="undo-2"></i></button>
+        <button class="icon-btn" data-cmd="redo" title="Redo (Ctrl+Y)"><i data-lucide="redo-2"></i></button>
+        <button class="icon-btn" data-cmd="share" title="Share"><i data-lucide="share-2"></i></button>
+        <button class="icon-btn" data-cmd="toggleTheme" title="Dark / light mode"><i data-lucide="moon"></i></button>
+      </div>
+    </header>
+
+    <!-- Ribbon tabs -->
+    <nav class="ribbon-tabs" role="tablist">
+      <button class="tab file-tab" data-cmd="openHub" role="tab">File</button>
+      <button class="tab active" data-tab="home" role="tab">Home</button>
+      <button class="tab" data-tab="insert" role="tab">Insert</button>
+      <button class="tab" data-tab="layout" role="tab">Layout</button>
+      <button class="tab" data-tab="review" role="tab">Review</button>
+      <button class="tab" data-tab="view" role="tab">View</button>
+      <button class="tab contextual hidden" data-tab="table" role="tab" id="tableTab">Table</button>
+      <button class="tab collapse-btn" data-cmd="toggleRibbon" title="Collapse ribbon"><i data-lucide="chevron-up"></i></button>
+    </nav>
+
+    <!-- Ribbon panels -->
+    <section class="ribbon" id="ribbon">
+      <!-- HOME -->
+      <div class="panel active" data-panel="home">
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="paste" title="Paste"><i data-lucide="clipboard-paste"></i><span>Paste</span></button>
+            <div class="stack">
+              <button data-cmd="cut" title="Cut (Ctrl+X)"><i data-lucide="scissors"></i></button>
+              <button data-cmd="copy" title="Copy (Ctrl+C)"><i data-lucide="copy"></i></button>
+              <button data-cmd="formatPainter" data-toggle="painter" title="Format painter"><i data-lucide="paintbrush"></i></button>
+            </div>
+          </div>
+          <div class="group-label">Clipboard</div>
+        </div>
+
+        <div class="group">
+          <div class="group-body column">
+            <div class="row">
+              <select id="fontFamily" title="Font" aria-label="Font">
+                <option value="">Default (Sans)</option>
+                <option value="sans-serif">Sans-serif</option><option value="serif">Serif</option><option value="monospace">Monospace</option>
+                <option>Arial</option><option>Helvetica</option><option>Verdana</option><option>Trebuchet MS</option>
+                <option>Georgia</option><option>Times New Roman</option><option>Palatino</option><option>Garamond</option>
+                <option>Courier New</option>
+              </select>
+              <select id="fontSize" title="Font size" aria-label="Font size">
+                <option>8</option><option>9</option><option>10</option><option>11</option><option value="" selected>12</option><option>14</option>
+                <option>16</option><option>18</option><option>20</option><option>24</option><option>28</option><option>32</option>
+                <option>36</option><option>48</option><option>60</option><option>72</option>
+              </select>
+              <button data-cmd="growFont" title="Increase font size (Ctrl+])"><i data-lucide="a-arrow-up"></i></button>
+              <button data-cmd="shrinkFont" title="Decrease font size (Ctrl+[)"><i data-lucide="a-arrow-down"></i></button>
+              <div class="menu-wrap">
+                <button data-menu="caseMenu" title="Change case"><i data-lucide="case-sensitive"></i></button>
+                <div class="menu" id="caseMenu">
+                  <button data-cmd="case:sentence">Sentence case.</button>
+                  <button data-cmd="case:lower">lowercase</button>
+                  <button data-cmd="case:upper">UPPERCASE</button>
+                  <button data-cmd="case:title">Capitalize Each Word</button>
+                  <button data-cmd="case:toggle">tOGGLE cASE</button>
+                </div>
+              </div>
+              <button data-cmd="clearFormat" title="Clear all formatting"><i data-lucide="remove-formatting"></i></button>
+            </div>
+            <div class="row">
+              <button data-cmd="bold" data-active="bold" title="Bold (Ctrl+B)"><i data-lucide="bold"></i></button>
+              <button data-cmd="italic" data-active="italic" title="Italic (Ctrl+I)"><i data-lucide="italic"></i></button>
+              <button data-cmd="underline" data-active="underline" title="Underline (Ctrl+U)"><i data-lucide="underline"></i></button>
+              <button data-cmd="strike" data-active="strike" title="Strikethrough"><i data-lucide="strikethrough"></i></button>
+              <button data-cmd="subscript" data-active="subscript" title="Subscript (Ctrl+,)"><i data-lucide="subscript"></i></button>
+              <button data-cmd="superscript" data-active="superscript" title="Superscript (Ctrl+.)"><i data-lucide="superscript"></i></button>
+              <div class="color-btn" title="Highlight colour">
+                <button data-cmd="highlight" class="color-main"><i data-lucide="highlighter"></i><span class="swatch" id="hlSwatch" style="background:#fff200"></span></button>
+                <button data-menu="hlMenu" class="color-drop"><i data-lucide="chevron-down"></i></button>
+                <div class="menu palette" id="hlMenu" data-palette="highlight"></div>
+              </div>
+              <div class="color-btn" title="Font colour">
+                <button data-cmd="color" class="color-main"><i data-lucide="baseline"></i><span class="swatch" id="colorSwatch" style="background:#d13438"></span></button>
+                <button data-menu="colorMenu" class="color-drop"><i data-lucide="chevron-down"></i></button>
+                <div class="menu palette" id="colorMenu" data-palette="color"></div>
+              </div>
+            </div>
+          </div>
+          <div class="group-label">Font</div>
+        </div>
+
+        <div class="group">
+          <div class="group-body column">
+            <div class="row">
+              <button data-cmd="bulletList" data-active="bulletList" title="Bullets"><i data-lucide="list"></i></button>
+              <button data-cmd="orderedList" data-active="orderedList" title="Numbering"><i data-lucide="list-ordered"></i></button>
+              <button data-cmd="taskList" data-active="taskList" title="Checklist"><i data-lucide="list-todo"></i></button>
+              <button data-cmd="outdent" title="Decrease indent (Shift+Tab)"><i data-lucide="indent-decrease"></i></button>
+              <button data-cmd="indent" title="Increase indent (Tab)"><i data-lucide="indent-increase"></i></button>
+            </div>
+            <div class="row">
+              <button data-cmd="align:left" data-active="align:left" title="Align left (Ctrl+L)"><i data-lucide="align-left"></i></button>
+              <button data-cmd="align:center" data-active="align:center" title="Center (Ctrl+E)"><i data-lucide="align-center"></i></button>
+              <button data-cmd="align:right" data-active="align:right" title="Align right (Ctrl+R)"><i data-lucide="align-right"></i></button>
+              <button data-cmd="align:justify" data-active="align:justify" title="Justify (Ctrl+J)"><i data-lucide="align-justify"></i></button>
+              <div class="menu-wrap">
+                <button data-menu="spacingMenu" title="Line and paragraph spacing"><i data-lucide="arrow-up-down"></i></button>
+                <div class="menu" id="spacingMenu">
+                  <button data-cmd="lineHeight:1">1.0</button>
+                  <button data-cmd="lineHeight:1.15">1.15</button>
+                  <button data-cmd="lineHeight:1.5">1.5</button>
+                  <button data-cmd="lineHeight:2">2.0</button>
+                  <button data-cmd="lineHeight:2.5">2.5</button>
+                  <button data-cmd="lineHeight:3">3.0</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="group-label">Paragraph</div>
+        </div>
+
+        <div class="group">
+          <div class="group-body styles" id="stylesGallery">
+            <button class="style-chip" data-cmd="style:p" data-active="style:p"><span style="font-size:13px">Normal</span></button>
+            <button class="style-chip" data-cmd="style:title" data-active="style:title"><span style="font-size:18px;font-weight:600">Title</span></button>
+            <button class="style-chip" data-cmd="style:h1" data-active="style:h1"><span style="font-size:15px;font-weight:700;color:var(--accent)">Heading 1</span></button>
+            <button class="style-chip" data-cmd="style:h2" data-active="style:h2"><span style="font-size:14px;font-weight:700;color:var(--accent)">Heading 2</span></button>
+            <button class="style-chip" data-cmd="style:h3" data-active="style:h3"><span style="font-size:13px;font-weight:700;color:var(--accent)">Heading 3</span></button>
+            <button class="style-chip" data-cmd="style:quote" data-active="style:quote"><span style="font-size:13px;font-style:italic">Quote</span></button>
+            <button class="style-chip" data-cmd="style:code" data-active="style:code"><span style="font-size:12px;font-family:monospace">Code</span></button>
+          </div>
+          <div class="group-label">Styles</div>
+        </div>
+
+        <div class="group">
+          <div class="group-body column">
+            <button class="wide-btn" data-cmd="find" title="Find (Ctrl+F)"><i data-lucide="search"></i><span>Find</span></button>
+            <button class="wide-btn" data-cmd="replace" title="Replace (Ctrl+H)"><i data-lucide="replace"></i><span>Replace</span></button>
+          </div>
+          <div class="group-label">Editing</div>
+        </div>
+      </div>
+
+      <!-- INSERT -->
+      <div class="panel" data-panel="insert">
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="pageBreak" title="Page break (Ctrl+Enter)"><i data-lucide="separator-horizontal"></i><span>Page break</span></button>
+          </div>
+          <div class="group-label">Pages</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="insertTable" title="Insert table"><i data-lucide="table"></i><span>Table</span></button>
+          </div>
+          <div class="group-label">Tables</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="insertImage" title="Insert picture"><i data-lucide="image"></i><span>Picture</span></button>
+            <button class="big-btn" data-cmd="hr" title="Horizontal line"><i data-lucide="minus"></i><span>Line</span></button>
+          </div>
+          <div class="group-label">Illustrations</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="link" data-active="link" title="Link (Ctrl+K)"><i data-lucide="link"></i><span>Link</span></button>
+            <button class="big-btn" data-cmd="comment" title="New comment"><i data-lucide="message-square-plus"></i><span>Comment</span></button>
+          </div>
+          <div class="group-label">Links &amp; Comments</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="editHeader" title="Header"><i data-lucide="panel-top"></i><span>Header</span></button>
+            <button class="big-btn" data-cmd="editFooter" title="Footer"><i data-lucide="panel-bottom"></i><span>Footer</span></button>
+            <button class="big-btn" data-cmd="pageNumbers" data-toggle="pageNumbers" title="Page numbers"><i data-lucide="hash"></i><span>Page #</span></button>
+          </div>
+          <div class="group-label">Header &amp; Footer</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="dateTime" title="Insert date &amp; time"><i data-lucide="calendar"></i><span>Date</span></button>
+            <button class="big-btn" data-cmd="symbol" title="Insert symbol"><i data-lucide="omega"></i><span>Symbol</span></button>
+            <button class="big-btn" data-cmd="style:code" title="Code block"><i data-lucide="square-code"></i><span>Code</span></button>
+          </div>
+          <div class="group-label">Text &amp; Symbols</div>
+        </div>
+      </div>
+
+      <!-- LAYOUT -->
+      <div class="panel" data-panel="layout">
+        <div class="group">
+          <div class="group-body">
+            <div class="menu-wrap">
+              <button class="big-btn" data-menu="marginsMenu"><i data-lucide="square"></i><span>Margins</span></button>
+              <div class="menu" id="marginsMenu">
+                <button data-cmd="margins:normal">Normal — 1″ all sides</button>
+                <button data-cmd="margins:narrow">Narrow — 0.5″</button>
+                <button data-cmd="margins:moderate">Moderate — 1″ / 0.75″</button>
+                <button data-cmd="margins:wide">Wide — 1″ / 2″</button>
+              </div>
+            </div>
+            <div class="menu-wrap">
+              <button class="big-btn" data-menu="orientMenu"><i data-lucide="rectangle-vertical"></i><span>Orientation</span></button>
+              <div class="menu" id="orientMenu">
+                <button data-cmd="orientation:portrait">Portrait</button>
+                <button data-cmd="orientation:landscape">Landscape</button>
+              </div>
+            </div>
+            <div class="menu-wrap">
+              <button class="big-btn" data-menu="sizeMenu"><i data-lucide="file"></i><span>Size</span></button>
+              <div class="menu" id="sizeMenu">
+                <button data-cmd="pageSize:letter">Letter — 8.5″ × 11″</button>
+                <button data-cmd="pageSize:legal">Legal — 8.5″ × 14″</button>
+                <button data-cmd="pageSize:a4">A4 — 21 × 29.7 cm</button>
+                <button data-cmd="pageSize:a5">A5 — 14.8 × 21 cm</button>
+              </div>
+            </div>
+            <div class="menu-wrap">
+              <button class="big-btn" data-menu="colsMenu"><i data-lucide="columns-2"></i><span>Columns</span></button>
+              <div class="menu" id="colsMenu">
+                <button data-cmd="columns:1">One</button>
+                <button data-cmd="columns:2">Two</button>
+                <button data-cmd="columns:3">Three</button>
+              </div>
+            </div>
+          </div>
+          <div class="group-label">Page Setup</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="pageBreak"><i data-lucide="separator-horizontal"></i><span>Break</span></button>
+            <button class="big-btn" data-cmd="indent"><i data-lucide="indent-increase"></i><span>Indent</span></button>
+            <button class="big-btn" data-cmd="outdent"><i data-lucide="indent-decrease"></i><span>Outdent</span></button>
+          </div>
+          <div class="group-label">Paragraph</div>
+        </div>
+      </div>
+
+      <!-- REVIEW -->
+      <div class="panel" data-panel="review">
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="spellcheck" data-toggle="spellcheck" title="Toggle spelling check"><i data-lucide="spell-check"></i><span>Spelling</span></button>
+            <button class="big-btn" data-cmd="wordCount" title="Word count"><i data-lucide="sigma"></i><span>Word count</span></button>
+          </div>
+          <div class="group-label">Proofing</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="readAloud" data-toggle="reading" title="Read aloud"><i data-lucide="volume-2"></i><span>Read aloud</span></button>
+            <button class="big-btn" data-cmd="dictate" data-toggle="dictating" title="Dictate" id="dictateBtn"><i data-lucide="mic"></i><span>Dictate</span></button>
+          </div>
+          <div class="group-label">Speech</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="comment"><i data-lucide="message-square-plus"></i><span>New comment</span></button>
+            <button class="big-btn" data-cmd="showComments" data-toggle="commentsPane"><i data-lucide="message-square"></i><span>Show comments</span></button>
+          </div>
+          <div class="group-label">Comments</div>
+        </div>
+      </div>
+
+      <!-- VIEW -->
+      <div class="panel" data-panel="view">
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="layout:print" data-toggle="printLayout"><i data-lucide="file-text"></i><span>Print layout</span></button>
+            <button class="big-btn" data-cmd="layout:web" data-toggle="webLayout"><i data-lucide="expand"></i><span>Web layout</span></button>
+            <button class="big-btn" data-cmd="focus" data-toggle="focusMode"><i data-lucide="focus"></i><span>Focus</span></button>
+          </div>
+          <div class="group-label">Views</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="navPane" data-toggle="navPane"><i data-lucide="list-tree"></i><span>Navigation</span></button>
+            <button class="big-btn" data-cmd="showComments" data-toggle="commentsPane"><i data-lucide="message-square"></i><span>Comments</span></button>
+          </div>
+          <div class="group-label">Show</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="zoomOut"><i data-lucide="zoom-out"></i><span>Zoom out</span></button>
+            <button class="big-btn" data-cmd="zoom:100"><i data-lucide="search"></i><span>100%</span></button>
+            <button class="big-btn" data-cmd="zoomIn"><i data-lucide="zoom-in"></i><span>Zoom in</span></button>
+            <button class="big-btn" data-cmd="zoom:fit"><i data-lucide="maximize"></i><span>Page width</span></button>
+          </div>
+          <div class="group-label">Zoom</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="toggleTheme"><i data-lucide="moon"></i><span>Dark mode</span></button>
+          </div>
+          <div class="group-label">Theme</div>
+        </div>
+      </div>
+
+      <!-- TABLE (contextual) -->
+      <div class="panel" data-panel="table">
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="tbl:addRowBefore"><i data-lucide="between-horizontal-start"></i><span>Row above</span></button>
+            <button class="big-btn" data-cmd="tbl:addRowAfter"><i data-lucide="between-horizontal-start"></i><span>Row below</span></button>
+            <button class="big-btn" data-cmd="tbl:addColumnBefore"><i data-lucide="between-vertical-start"></i><span>Col left</span></button>
+            <button class="big-btn" data-cmd="tbl:addColumnAfter"><i data-lucide="between-vertical-start"></i><span>Col right</span></button>
+          </div>
+          <div class="group-label">Insert</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="tbl:deleteRow"><i data-lucide="rows-3"></i><span>Delete row</span></button>
+            <button class="big-btn" data-cmd="tbl:deleteColumn"><i data-lucide="columns-3"></i><span>Delete col</span></button>
+            <button class="big-btn" data-cmd="tbl:deleteTable"><i data-lucide="trash-2"></i><span>Delete table</span></button>
+          </div>
+          <div class="group-label">Delete</div>
+        </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="tbl:mergeCells"><i data-lucide="table-cells-merge"></i><span>Merge</span></button>
+            <button class="big-btn" data-cmd="tbl:splitCell"><i data-lucide="table-cells-split"></i><span>Split</span></button>
+            <button class="big-btn" data-cmd="tbl:toggleHeaderRow"><i data-lucide="panel-top"></i><span>Header row</span></button>
+          </div>
+          <div class="group-label">Cells</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Find / replace bar -->
+    <div class="findbar hidden" id="findbar" role="search">
+      <input id="findInput" placeholder="Find in document" aria-label="Find" />
+      <span id="findCount" class="find-count"></span>
+      <button data-cmd="findPrev" title="Previous (Shift+Enter)"><i data-lucide="arrow-up"></i></button>
+      <button data-cmd="findNext" title="Next (Enter)"><i data-lucide="arrow-down"></i></button>
+      <label class="chk"><input type="checkbox" id="findCase" /> Match case</label>
+      <span class="replace-part">
+        <input id="replaceInput" placeholder="Replace with" aria-label="Replace with" />
+        <button class="txt-btn" data-cmd="replaceOne">Replace</button>
+        <button class="txt-btn" data-cmd="replaceAll">Replace all</button>
+      </span>
+      <button data-cmd="closeFind" title="Close (Esc)"><i data-lucide="x"></i></button>
+    </div>
+
+    <!-- Workspace -->
+    <main class="workspace">
+      <aside class="side-pane left hidden" id="navPane">
+        <div class="pane-head"><span>Navigation</span><button data-cmd="navPane"><i data-lucide="x"></i></button></div>
+        <div class="pane-body" id="navList"></div>
+      </aside>
+
+      <div class="canvas" id="canvas">
+        <div class="zoomer" id="zoomer">
+          <div class="page" id="page">
+            <div class="page-header" id="pageHeader" contenteditable="true" data-placeholder="Header" spellcheck="true"></div>
+            <div id="editor"></div>
+            <div class="page-footer" id="pageFooter">
+              <div class="footer-text" id="footerText" contenteditable="true" data-placeholder="Footer" spellcheck="true"></div>
+              <div class="page-num hidden" id="pageNumLabel">Page <span class="pn-current"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side-pane right hidden" id="commentsPane">
+        <div class="pane-head"><span>Comments</span><button data-cmd="showComments"><i data-lucide="x"></i></button></div>
+        <div class="pane-body" id="commentList"></div>
+      </aside>
+    </main>
+
+    <!-- Status bar -->
+    <footer class="statusbar">
+      <span id="statPages">Page 1 of 1</span>
+      <button class="link-btn" id="statWords" data-cmd="wordCount">0 words</button>
+      <span class="hide-sm">English (US)</span>
+      <span class="spacer"></span>
+      <button class="icon-btn sm" data-cmd="zoomOut" title="Zoom out"><i data-lucide="minus"></i></button>
+      <input type="range" id="zoomRange" min="50" max="200" step="10" value="100" aria-label="Zoom" class="hide-sm" />
+      <button class="icon-btn sm" data-cmd="zoomIn" title="Zoom in"><i data-lucide="plus"></i></button>
+      <button class="link-btn" id="zoomLabel" data-cmd="zoom:100">100%</button>
+    </footer>
+  </div>
+
+  <!-- Document hub (File) -->
+  <div class="hub hidden" id="hub">
+    <div class="bs-nav">
+      <button class="bs-back" data-cmd="closeHub"><i data-lucide="x"></i><span>Close</span></button>
+      <button data-bs="home" class="active"><i data-lucide="file-plus"></i><span>New</span></button>
+      <button data-bs="open"><i data-lucide="folder-open"></i><span>Open</span></button>
+      <button data-bs="export"><i data-lucide="download"></i><span>Save a copy</span></button>
+      <button data-cmd="print"><i data-lucide="printer"></i><span>Print / PDF</span></button>
+      <button data-cmd="share"><i data-lucide="share-2"></i><span>Share</span></button>
+      <button data-bs="about"><i data-lucide="info"></i><span>About</span></button>
+    </div>
+    <div class="bs-main">
+      <section data-bs-panel="home" class="active">
+        <h2>New</h2>
+        <div class="templates">
+          <button class="tpl" data-cmd="new:blank"><div class="tpl-thumb"></div><span>Blank document</span></button>
+          <button class="tpl" data-cmd="new:letter"><div class="tpl-thumb lines"></div><span>Letter</span></button>
+          <button class="tpl" data-cmd="new:resume"><div class="tpl-thumb resume"></div><span>Resume</span></button>
+          <button class="tpl" data-cmd="new:report"><div class="tpl-thumb report"></div><span>Report</span></button>
+          <button class="tpl" data-cmd="new:notes"><div class="tpl-thumb notes"></div><span>Meeting notes</span></button>
+        </div>
+        <h3>Recent</h3>
+        <div class="recent" id="recentList"></div>
+      </section>
+      <section data-bs-panel="open">
+        <h2>Open</h2>
+        <p class="muted">Open .docx documents, web pages (.html), Markdown (.md) or plain text (.txt) from this device or any cloud drive your device can browse.</p>
+        <button class="primary-btn" data-cmd="openFile"><i data-lucide="folder-open"></i> Browse…</button>
+        <h3>Recent</h3>
+        <div class="recent" id="recentList2"></div>
+      </section>
+      <section data-bs-panel="export">
+        <h2>Save a copy</h2>
+        <p class="muted">Your work saves automatically on this device. Download a copy to share or keep elsewhere.</p>
+        <div class="export-list">
+          <button data-cmd="export:docx"><i data-lucide="file-text"></i><div><b>Office Open XML document (.docx)</b><span>The standard format most word processors open</span></div></button>
+          <button data-cmd="print"><i data-lucide="printer"></i><div><b>PDF</b><span>Use “Save as PDF” in the print dialog</span></div></button>
+          <button data-cmd="export:html"><i data-lucide="code"></i><div><b>Web page (.html)</b><span>Keeps all formatting</span></div></button>
+          <button data-cmd="export:md"><i data-lucide="hash"></i><div><b>Markdown (.md)</b><span>Plain text with simple formatting</span></div></button>
+          <button data-cmd="export:txt"><i data-lucide="type"></i><div><b>Plain text (.txt)</b><span>Text only</span></div></button>
+        </div>
+      </section>
+      <section data-bs-panel="about">
+        <h2>About Dynoword</h2>
+        <p>An independent, open-source word processor that runs in your browser and installs like a native app.</p>
+        <ul class="about-list">
+          <li><b>Windows / Mac:</b> open in Edge or Chrome, then choose <i>Install Dynoword</i> from the address bar.</li>
+          <li><b>iPhone / iPad:</b> open in Safari, tap <i>Share</i> → <i>Add to Home Screen</i>.</li>
+          <li><b>Android:</b> open in Chrome, tap <i>⋮</i> → <i>Install app</i>.</li>
+          <li>Works offline. Documents are stored privately on your device.</li>
+        </ul>
+        <button class="primary-btn hidden" id="installBtn" data-cmd="install"><i data-lucide="download"></i> Install app</button>
+        <h3>Keyboard shortcuts</h3>
+        <p class="muted">On Mac and iPad use ⌘ instead of Ctrl.</p>
+        <table class="kbd-table">
+          <tr><td>Ctrl+B / I / U</td><td>Bold / Italic / Underline</td></tr>
+          <tr><td>Ctrl+Z / Ctrl+Y</td><td>Undo / Redo</td></tr>
+          <tr><td>Ctrl+F / Ctrl+H</td><td>Find / Replace</td></tr>
+          <tr><td>Ctrl+K</td><td>Insert link</td></tr>
+          <tr><td>Ctrl+Enter</td><td>Page break</td></tr>
+          <tr><td>Ctrl+S</td><td>Save a copy (.docx)</td></tr>
+          <tr><td>Ctrl+O</td><td>Open</td></tr>
+          <tr><td>Ctrl+P</td><td>Print / PDF</td></tr>
+          <tr><td>Ctrl+L / E / R / J</td><td>Align left / center / right / justify</td></tr>
+          <tr><td>Ctrl+Alt+1…3</td><td>Heading 1…3</td></tr>
+          <tr><td>Ctrl+] / Ctrl+[</td><td>Bigger / smaller font</td></tr>
+        </table>
+        <p class="muted small-print">Dynoword is MIT-licensed open source and is not affiliated with any other software vendor. It uses the open .docx (ECMA-376) format for compatibility. All trademarks belong to their owners.</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- Dialogs -->
+  <dialog id="dlg">
+    <form method="dialog" class="dlg-form">
+      <h3 id="dlgTitle"></h3>
+      <div id="dlgBody"></div>
+      <div class="dlg-actions">
+        <button value="cancel" class="txt-btn" id="dlgCancel">Cancel</button>
+        <button value="ok" class="primary-btn" id="dlgOk">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <input type="file" id="fileInput" accept=".docx,.html,.htm,.txt,.md,.markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/plain" hidden />
+  <input type="file" id="imageInput" accept="image/*" hidden />
+  <div class="toast" id="toast" role="status"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
