@@ -42,7 +42,10 @@ document unchanged.
 
 **Table tools** – insert/delete rows and columns, merge/split cells, header row, resizable columns.
 
-**Files** – autosave, recent documents, templates (letter, resume, report, meeting notes).
+**Files** – autosave, recent documents, and a template gallery with live previews: letter, report,
+meeting notes, and ten résumé templates (Classic, ATS standard, Modern, Student / entry-level, Software
+engineer, Career change, Executive, Academic CV, Designer / creative, Cover letter) — all single-column
+layouts that pass the ATS check.
 Open **.docx**, .html, .md, .txt. Save a copy as **.docx** (with styles, lists, tables, images,
 comments, header/footer and page numbers), **PDF** (print), .html, .md, .txt. Share via the
 iOS/Android/Windows share sheet. When installed on Windows/ChromeOS, Dynoword can be the app that

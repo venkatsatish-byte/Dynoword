@@ -1303,6 +1303,20 @@ async function share() {
 
 // ---------- Document hub ----------
 
+// Template gallery with live miniature previews of each template.
+function buildTemplateGallery() {
+  $$('[data-templates]').forEach((grid) => {
+    grid.innerHTML = Object.entries(TEMPLATES)
+      .filter(([, t]) => t.group === grid.dataset.templates)
+      .map(([key, t]) => `
+        <button class="tpl" data-cmd="new:${key}" title="${escapeAttr(t.blurb || t.label)}">
+          <div class="tpl-thumb"><div class="tpl-mini doc-body">${t.html()}</div></div>
+          <span>${escapeHtml(t.label)}</span>
+          ${t.blurb ? `<small>${escapeHtml(t.blurb)}</small>` : ''}
+        </button>`).join('');
+  });
+}
+
 async function renderRecent() {
   const docs = await listDocs();
   const html = docs.length ? docs.map((d) => `
@@ -1344,6 +1358,7 @@ async function openHub() {
   await persist();
   await renderRecent();
   $('#hub').classList.remove('hidden');
+  layoutTabs($('#hub'));
 }
 function closeHub() { $('#hub').classList.add('hidden'); }
 
@@ -1401,6 +1416,7 @@ if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) $('#dictateBt
 async function boot() {
   createIcons({ icons });
   buildPalettes();
+  buildTemplateGallery();
 
   const small = window.matchMedia('(max-width: 760px)').matches;
   try { state.showRuler = (localStorage.getItem('dw-ruler') ?? '1') === '1'; } catch { state.showRuler = true; }
