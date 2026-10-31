@@ -55,8 +55,12 @@ Built with [Tiptap](https://tiptap.dev) (ProseMirror), [docx](https://docx.js.or
 
 ## Deploy
 
-Pushing to `main` runs `.github/workflows/deploy.yml`, which publishes `dist/` to GitHub Pages.
-Enable it once under **Settings → Pages → Source: GitHub Actions**.
+The site is hosted on [Netlify](https://www.netlify.com), configured by `netlify.toml`
+(build command `npm run build`, publish directory `dist`). Every push to `main` redeploys
+automatically, and installed copies of the app update the next time they open online.
+
+To set it up: sign in to Netlify with GitHub → **Add new site → Import an existing project** →
+pick this repository. The build settings are read from `netlify.toml`, so just click **Deploy**.
 
 ## Licence and notices
 
