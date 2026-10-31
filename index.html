@@ -30,6 +30,7 @@
         <button class="icon-btn" data-cmd="undo" title="Undo (Ctrl+Z)"><i data-lucide="undo-2"></i></button>
         <button class="icon-btn" data-cmd="redo" title="Redo (Ctrl+Y)"><i data-lucide="redo-2"></i></button>
         <button class="icon-btn" data-cmd="share" title="Share"><i data-lucide="share-2"></i></button>
+        <button class="icon-btn hidden" id="accountBtn" data-cmd="account" title="Account and subscription"><i data-lucide="circle-user-round"></i></button>
         <button class="icon-btn" data-cmd="toggleTheme" title="Dark / light mode"><i data-lucide="moon"></i></button>
       </div>
     </header>
@@ -392,6 +393,12 @@
       </div>
     </section>
 
+    <!-- Trial / subscription status -->
+    <div class="plan-banner hidden" id="planBanner" role="status">
+      <span id="planText"></span>
+      <button class="primary-btn sm" id="planAction"></button>
+    </div>
+
     <!-- Find / replace bar -->
     <div class="findbar hidden" id="findbar" role="search">
       <input id="findInput" placeholder="Find in document" aria-label="Find" />
@@ -474,19 +481,15 @@
       <button data-bs="export"><i data-lucide="download"></i><span>Save a copy</span></button>
       <button data-cmd="print"><i data-lucide="printer"></i><span>Print / PDF</span></button>
       <button data-cmd="share"><i data-lucide="share-2"></i><span>Share</span></button>
+      <button data-bs="account"><i data-lucide="circle-user-round"></i><span>Account</span></button>
       <button data-bs="about"><i data-lucide="info"></i><span>About</span></button>
     </div>
     <div class="bs-main">
       <section data-bs-panel="home" class="active">
         <h2>New</h2>
-        <div class="templates">
-          <button class="tpl" data-cmd="new:blank"><div class="tpl-thumb"></div><span>Blank document</span></button>
-          <button class="tpl" data-cmd="new:letter"><div class="tpl-thumb lines"></div><span>Letter</span></button>
-          <button class="tpl" data-cmd="new:resume"><div class="tpl-thumb resume"></div><span>Resume</span></button>
-          <button class="tpl" data-cmd="new:atsResume"><div class="tpl-thumb resume ats"></div><span>ATS résumé</span></button>
-          <button class="tpl" data-cmd="new:report"><div class="tpl-thumb report"></div><span>Report</span></button>
-          <button class="tpl" data-cmd="new:notes"><div class="tpl-thumb notes"></div><span>Meeting notes</span></button>
-        </div>
+        <div class="templates" data-templates="doc"></div>
+        <h3>Résumés &amp; cover letters <span class="muted small">— single-column layouts that pass the ATS check</span></h3>
+        <div class="templates" data-templates="resume"></div>
         <h3>Recent</h3>
         <div class="recent" id="recentList"></div>
       </section>
@@ -508,6 +511,10 @@
           <button data-cmd="export:md"><i data-lucide="hash"></i><div><b>Markdown (.md)</b><span>Plain text with simple formatting</span></div></button>
           <button data-cmd="export:txt"><i data-lucide="type"></i><div><b>Plain text (.txt)</b><span>Text only</span></div></button>
         </div>
+      </section>
+      <section data-bs-panel="account">
+        <h2>Account</h2>
+        <div id="accountBody" class="account-body"></div>
       </section>
       <section data-bs-panel="about">
         <h2>About Dynoword</h2>

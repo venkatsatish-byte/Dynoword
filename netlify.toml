@@ -5,6 +5,11 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# Sign-in and subscription checks (/api/account, /api/checkout, /api/portal).
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 # The service worker must always be re-checked so installed apps pick up new releases.
 [[headers]]
   for = "/sw.js"

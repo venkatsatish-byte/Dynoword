@@ -11,14 +11,20 @@ const SAFE_FONTS = ['arial', 'helvetica', 'verdana', 'georgia', 'times new roman
   'tahoma', 'calibri', 'cambria', 'book antiqua', 'courier new', 'sans-serif', 'serif', 'liberation sans', 'liberation serif'];
 
 export const SECTIONS = {
-  summary: ['summary', 'professional summary', 'profile', 'professional profile', 'objective', 'career objective', 'about me', 'career summary'],
+  summary: ['summary', 'professional summary', 'profile', 'professional profile', 'objective', 'career objective', 'about me', 'career summary',
+    'executive summary', 'executive profile', 'summary of qualifications'],
   experience: ['experience', 'work experience', 'professional experience', 'employment history', 'employment', 'work history',
-    'relevant experience', 'career history', 'professional history'],
+    'relevant experience', 'career history', 'professional history', 'internship experience', 'internships',
+    'academic appointments', 'research experience', 'teaching experience', 'leadership experience', 'military experience'],
   education: ['education', 'academic background', 'education and training', 'academic qualifications', 'qualifications'],
-  skills: ['skills', 'technical skills', 'core competencies', 'key skills', 'competencies', 'skills and abilities', 'areas of expertise'],
+  skills: ['skills', 'technical skills', 'core competencies', 'key skills', 'competencies', 'skills and abilities', 'areas of expertise',
+    'transferable skills', 'relevant skills', 'skills summary'],
   other: ['certifications', 'certificates', 'licenses and certifications', 'projects', 'awards', 'honors', 'publications',
     'volunteer experience', 'volunteering', 'languages', 'interests', 'references', 'training', 'achievements', 'activities',
-    'leadership', 'memberships', 'professional development', 'additional information'],
+    'leadership', 'memberships', 'professional development', 'additional information', 'career highlights',
+    'key achievements', 'selected achievements', 'board and affiliations', 'affiliations', 'professional affiliations',
+    'research interests', 'grants', 'grants and awards', 'awards and honors', 'presentations', 'selected projects',
+    'technical projects', 'portfolio', 'relevant coursework', 'coursework', 'education and certifications'],
 };
 const REQUIRED = { experience: 'Work Experience', education: 'Education', skills: 'Skills' };
 
@@ -114,8 +120,10 @@ export function analyze(doc, settings, { pageCount = 1 } = {}) {
     else add('warn', 'Start with your name', 'Put your full name alone on the first line, then your contact details.', { range: { from: firstBlock.pos + 1, to: firstBlock.pos + firstBlock.node.nodeSize - 1 } });
   }
 
-  // Sections and headings
-  Object.entries(REQUIRED).forEach(([key, label]) => {
+  // Sections and headings (a cover letter has none of the résumé sections, so skip those checks)
+  const isLetter = /\bDear\b/.test(text) && /\b(Sincerely|Regards|Yours|Respectfully)\b/i.test(text);
+  if (isLetter) add('info', 'Looks like a cover letter', 'Résumé section checks are skipped. Keep it to about 250–400 words.');
+  Object.entries(isLetter ? {} : REQUIRED).forEach(([key, label]) => {
     if (found[key]) add('pass', `${label} section`, 'Found a standard section heading.');
     else add('warn', `No “${label}” section`, `ATS look for standard section names. Add a heading such as “${label}”.`);
   });
@@ -149,7 +157,9 @@ export function analyze(doc, settings, { pageCount = 1 } = {}) {
   if (settings.pageColor) add('info', 'Page colour', 'Coloured pages print poorly and some ATS previews show them oddly.', { fix: 'pageColor' });
 
   // Length
-  if (words < 150) add('warn', `Short résumé (${words} words)`, 'Most effective résumés have 300–800 words. Add achievements with numbers.');
+  if (isLetter) {
+    if (words > 450) add('warn', `Long cover letter (${words} words)`, 'Aim for 250–400 words — three or four short paragraphs.');
+  } else if (words < 150) add('warn', `Short résumé (${words} words)`, 'Most effective résumés have 300–800 words. Add achievements with numbers.');
   else if (words > 1100 || pageCount > 2) add('warn', `Long résumé (${words} words, ${pageCount} pages)`, 'Keep it to one or two pages; focus on the last 10–15 years.');
   else add('pass', `Good length (${words} words)`, 'Between one and two pages.');
 
