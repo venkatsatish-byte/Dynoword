@@ -368,7 +368,11 @@ export async function exportDocx(json, settings) {
       properties: {
         page: {
           size: { width: tw(size.w), height: tw(size.h), orientation: landscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT },
-          margin: { top: tw(m.top), bottom: tw(m.bottom), left: tw(m.left), right: tw(m.right) },
+          margin: {
+            top: tw(m.top), bottom: tw(m.bottom), left: tw(m.left), right: tw(m.right),
+            // Header and footer 0.5in from the page edge, as on screen.
+            header: tw(Math.max(0.2, Math.min(0.5, m.top - 0.45))), footer: tw(Math.max(0.2, Math.min(0.5, m.bottom - 0.45))),
+          },
         },
         column: settings.columns > 1 ? { count: settings.columns, space: 720 } : undefined,
       },
