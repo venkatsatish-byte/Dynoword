@@ -13,7 +13,8 @@ import { CharacterCount, Placeholder } from '@tiptap/extensions';
 import { createIcons } from 'lucide';
 import { icons } from './icons.js';
 
-import { ParagraphFormat, PageBreak, Comment, Search, WordShortcuts } from './extensions.js';
+import { ParagraphFormat, Tab, PageBreak, Comment, Search, WordShortcuts } from './extensions.js';
+import { createRuler, layoutTabs, toDisplay, fromDisplay, UNIT } from './ruler.js';
 import { PAGE_SIZES, MARGINS, DEFAULT_SETTINGS } from './page.js';
 import { saveDoc, getDoc, listDocs, deleteDoc, newId } from './storage.js';
 import { readFile, download, safeFilename, standaloneHtml, htmlToMarkdown } from './io.js';
@@ -27,6 +28,11 @@ const TEXT_COLORS = ['#111827', '#374151', '#6b7280', '#d1d5db', '#ffffff', '#b9
   '#15803d', '#0f766e', '#0891b2', '#2563eb', '#4338ca', '#7c3aed', '#c026d3', '#be185d'];
 const HIGHLIGHTS = ['#fde047', '#bef264', '#86efac', '#5eead4', '#7dd3fc', '#a5b4fc', '#d8b4fe', '#f9a8d4',
   '#fca5a5', '#fdba74', '#e5e7eb', '#9ca3af'];
+const SHADES = ['#f1f5f9', '#e2e8f0', '#cbd5e1', '#fef9c3', '#fde68a', '#dcfce7', '#ccfbf1', '#e0f2fe',
+  '#dbeafe', '#e0e7ff', '#f3e8ff', '#fce7f3', '#fee2e2', '#ffedd5', '#1e293b', '#0f766e'];
+const PAGE_COLORS = ['#ffffff', '#fffbeb', '#fefce8', '#f0fdf4', '#f0fdfa', '#f0f9ff', '#eff6ff', '#f5f3ff',
+  '#fdf2f8', '#fff1f2', '#f8fafc', '#f5f5f4', '#e7e5e4', '#1e293b', '#0f172a', '#134e4a'];
+const PARA_DEFAULTS = { paragraph: { spaceBefore: 0, spaceAfter: 8 }, heading: { spaceBefore: 12, spaceAfter: 4 } };
 const SYMBOLS = '© ® ™ § ¶ † ‡ • · … – — ‘ ’ “ ” « » ‹ › ° ± × ÷ ≠ ≈ ≤ ≥ ∞ √ ∑ ∏ ∫ ∂ π µ Ω α β γ δ ε θ λ σ φ ψ ω ← → ↑ ↓ ↔ ⇒ ⇔ ✓ ✗ ★ ☆ ♥ ♦ ♣ ♠ € £ ¥ ₹ ¢ ½ ⅓ ¼ ¾ ¹ ² ³ ☐ ☑ ☺ ☹ ♪ ⚠'.split(' ');
 
 const state = {
@@ -34,6 +40,7 @@ const state = {
   zoom: 100,
   textColor: '#b91c1c',
   hlColor: '#fde047',
+  shadeColor: '#e2e8f0',
   painter: null,
   layout: 'print',
   saveTimer: null,
@@ -64,6 +71,7 @@ const editor = new Editor({
     CharacterCount,
     Placeholder.configure({ placeholder: ({ editor: ed }) => (ed.isEmpty ? 'Start typing…' : '') }),
     ParagraphFormat,
+    Tab,
     PageBreak,
     Comment,
     Search,
@@ -83,7 +91,7 @@ const editor = new Editor({
   },
   onUpdate: () => { scheduleSave(); scheduleLayout(); refreshNav(); refreshComments(); },
   onSelectionUpdate: () => updateToolbar(),
-  onTransaction: () => updateToolbar(),
+  onTransaction: () => { updateToolbar(); scheduleTabs(); },
 });
 window.dynoword = editor;
 
@@ -213,7 +221,17 @@ const commands = {
   superscript: () => chain().toggleSuperscript().run(),
   growFont: () => stepFont(1),
   shrinkFont: () => stepFont(-1),
-  clearFormat: () => chain().unsetAllMarks().setParagraph().unsetTextAlign().setLineSpacing(null).run(),
+  clearFormat: () => chain().unsetAllMarks().setParagraph().unsetTextAlign().setParagraphFormat({
+    lineHeight: null, leftIndent: 0, rightIndent: 0, firstLine: 0, spaceBefore: null, spaceAfter: null, border: null, shading: null, tabStops: null,
+  }).run(),
+  shading: () => chain().setParagraphFormat({ shading: state.shadeColor }).run(),
+  paragraphDialog,
+  ruler: () => {
+    state.showRuler = !state.showRuler;
+    try { localStorage.setItem('dw-ruler', state.showRuler ? '1' : '0'); } catch {}
+    document.body.classList.toggle('no-ruler', !state.showRuler);
+    updateToolbar();
+  },
   color: () => chain().setColor(state.textColor).run(),
   highlight: () => chain().toggleHighlight({ color: state.hlColor }).run(),
   bulletList: () => chain().toggleBulletList().run(),
@@ -271,6 +289,12 @@ const paramCommands = {
   case: changeCase,
   align: (v) => chain().setTextAlign(v).run(),
   lineHeight: (v) => chain().setLineSpacing(v).run(),
+  paraSpace: (which) => {
+    const key = which === 'before' ? 'spaceBefore' : 'spaceAfter';
+    const cur = paraValue(currentBlock(), key);
+    chain().setParagraphFormat({ [key]: cur > 0 ? 0 : which === 'before' ? 12 : 8 }).run();
+  },
+  border: (v) => chain().setParagraphFormat({ border: v === 'none' ? null : v }).run(),
   style: setStyle,
   margins: (v) => updateSettings({ margins: v }),
   orientation: (v) => updateSettings({ orientation: v }),
@@ -335,15 +359,23 @@ window.addEventListener('resize', closeMenus);
 function buildPalettes() {
   $$('[data-palette]').forEach((menu) => {
     const kind = menu.dataset.palette;
-    const colors = kind === 'color' ? TEXT_COLORS : HIGHLIGHTS;
+    const colors = { color: TEXT_COLORS, highlight: HIGHLIGHTS, shading: SHADES, page: PAGE_COLORS }[kind];
+    const initial = { color: state.textColor, highlight: state.hlColor, shading: state.shadeColor, page: '#ffffff' }[kind];
     menu.innerHTML = `
       <div class="swatches">${colors.map((c) => `<button class="sw" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div>
       <button class="none-btn" data-color="">${kind === 'color' ? 'Automatic' : 'No colour'}</button>
-      <label class="custom-color">More colours… <input type="color" value="${kind === 'color' ? state.textColor : state.hlColor}"></label>`;
+      <label class="custom-color">More colours… <input type="color" value="${initial}"></label>`;
     const apply = (c) => {
       if (kind === 'color') {
         if (c) { state.textColor = c; $('#colorSwatch').style.background = c; chain().setColor(c).run(); } else chain().unsetColor().run();
-      } else if (c) { state.hlColor = c; $('#hlSwatch').style.background = c; chain().setHighlight({ color: c }).run(); } else chain().unsetHighlight().run();
+      } else if (kind === 'highlight') {
+        if (c) { state.hlColor = c; $('#hlSwatch').style.background = c; chain().setHighlight({ color: c }).run(); } else chain().unsetHighlight().run();
+      } else if (kind === 'shading') {
+        if (c) { state.shadeColor = c; $('#shadeSwatch').style.background = c; }
+        chain().setParagraphFormat({ shading: c || null }).run();
+      } else {
+        updateSettings({ pageColor: c && c !== '#ffffff' ? c : null });
+      }
       closeMenus();
     };
     menu.addEventListener('click', (e) => {
@@ -404,14 +436,180 @@ function updateToolbar() {
       printLayout: state.layout === 'print',
       webLayout: state.layout === 'web',
       focusMode: document.body.classList.contains('focus-mode'),
+      ruler: state.showRuler,
     };
     $$('[data-toggle]').forEach((b) => b.classList.toggle('on', !!toggles[b.dataset.toggle]));
     const inTable = editor.isActive('table');
     $('#tableTab').classList.toggle('hidden', !inTable);
     if (!inTable && $('#tableTab').classList.contains('active')) selectTab('home');
     $('#statWords').textContent = `${editor.storage.characterCount.words().toLocaleString()} words`;
+    updateParagraphControls();
     updateCurrentPage();
   });
+}
+
+// ---------- Paragraph layout: ruler, spinners, dialog ----------
+
+const BLOCKS = ['paragraph', 'heading'];
+
+function currentBlock() {
+  const { $from } = editor.state.selection;
+  for (let d = $from.depth; d >= 0; d--) {
+    const n = $from.node(d);
+    if (BLOCKS.includes(n.type.name)) return n;
+  }
+  return null;
+}
+
+function paraValue(node, key) {
+  if (!node) return 0;
+  const v = node.attrs[key];
+  if (v != null) return v;
+  return PARA_DEFAULTS[node.type.name]?.[key] ?? 0;
+}
+
+function isDarkColor(c) {
+  const hex = c.replace('#', '');
+  if (hex.length < 6) return false;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 128;
+}
+
+// Documents saved before version 2 stored the left indent as a count of half-inch steps.
+function migrateIndent(json) {
+  if (json.attrs && json.attrs.indent != null) {
+    if (json.attrs.indent && !json.attrs.leftIndent) json.attrs.leftIndent = json.attrs.indent * 0.5;
+    delete json.attrs.indent;
+  }
+  (json.content || []).forEach(migrateIndent);
+}
+
+function pageGeometry() {
+  const s = state.doc?.settings || DEFAULT_SETTINGS;
+  const size = PAGE_SIZES[s.pageSize] || PAGE_SIZES.letter;
+  const m = MARGINS[s.margins] || MARGINS.normal;
+  return { pageW: s.orientation === 'landscape' ? size.h : size.w, mL: m.left, mR: m.right };
+}
+
+const ruler = createRuler($('#ruler'), {
+  getGeometry: pageGeometry,
+  getAttrs: () => {
+    const n = currentBlock();
+    if (!n) return null;
+    const a = n.attrs;
+    return { leftIndent: a.leftIndent || 0, rightIndent: a.rightIndent || 0, firstLine: a.firstLine || 0, tabStops: a.tabStops || [] };
+  },
+  onChange: (attrs) => chain().setParagraphFormat(attrs).run(),
+  guide: $('#rulerGuide'),
+});
+
+$$('.unit-len').forEach((e) => { e.textContent = UNIT; });
+
+function updateParagraphControls() {
+  if (state.showRuler && state.layout === 'print') ruler.render();
+  const n = currentBlock();
+  $$('[data-para]').forEach((input) => {
+    if (document.activeElement === input) return;
+    input.disabled = !n;
+    const key = input.dataset.para;
+    const v = paraValue(n, key);
+    input.value = key.endsWith('Indent') ? toDisplay(v) : v;
+  });
+}
+
+$$('[data-para]').forEach((input) => {
+  if (input.dataset.para.endsWith('Indent')) input.step = UNIT === 'cm' ? '0.25' : '0.1';
+  input.addEventListener('change', () => {
+    const key = input.dataset.para;
+    let v = Math.max(0, parseFloat(input.value) || 0);
+    if (key.endsWith('Indent')) v = +fromDisplay(v).toFixed(4);
+    chain().setParagraphFormat({ [key]: v }).run();
+  });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { input.blur(); editor.commands.focus(); } });
+});
+
+async function paragraphDialog() {
+  const n = currentBlock();
+  if (!n) return toast('Place the cursor in a paragraph first');
+  const a = n.attrs;
+  const fl = a.firstLine || 0;
+  const lh = a.lineHeight ? String(a.lineHeight) : '';
+  const presets = { '': 'Default', 1: 'Single', 1.15: '1.15', 1.5: '1.5 lines', 2: 'Double' };
+  const isPreset = lh in presets;
+  let stops = (a.tabStops || []).map((t) => ({ ...t }));
+  const len = (v) => toDisplay(v || 0);
+  const lenStep = UNIT === 'cm' ? '0.1' : '0.05';
+  const stopsHtml = () => (stops.length
+    ? stops.map((t, i) => `<li><span>${toDisplay(t.pos)} ${UNIT} · ${t.align}</span><button type="button" class="txt-btn sm" data-rm="${i}">Remove</button></li>`).join('')
+    : '<li class="muted">No custom tab stops — default stops every 0.5 in.</li>');
+
+  const body = await dialog('Paragraph', `
+    <div class="pd-grid">
+      <label>Alignment
+        <select name="align">${['left', 'center', 'right', 'justify'].map((v) => `<option value="${v}" ${(a.textAlign || 'left') === v ? 'selected' : ''}>${v[0].toUpperCase() + v.slice(1)}</option>`).join('')}</select>
+      </label>
+      <span></span>
+      <h4>Indentation (${UNIT})</h4>
+      <label>Left <input name="left" type="number" min="0" step="${lenStep}" value="${len(a.leftIndent)}"></label>
+      <label>Right <input name="right" type="number" min="0" step="${lenStep}" value="${len(a.rightIndent)}"></label>
+      <label>Special
+        <select name="special">
+          <option value="none" ${fl === 0 ? 'selected' : ''}>(none)</option>
+          <option value="first" ${fl > 0 ? 'selected' : ''}>First line</option>
+          <option value="hanging" ${fl < 0 ? 'selected' : ''}>Hanging</option>
+        </select>
+      </label>
+      <label>By <input name="by" type="number" min="0" step="${lenStep}" value="${len(Math.abs(fl) || 0.5)}"></label>
+      <h4>Spacing</h4>
+      <label>Before (pt) <input name="before" type="number" min="0" step="6" value="${paraValue(n, 'spaceBefore')}"></label>
+      <label>After (pt) <input name="after" type="number" min="0" step="6" value="${paraValue(n, 'spaceAfter')}"></label>
+      <label>Line spacing
+        <select name="lh">${Object.entries(presets).map(([v, l]) => `<option value="${v}" ${isPreset && lh === v ? 'selected' : ''}>${l}</option>`).join('')}
+          <option value="multiple" ${!isPreset ? 'selected' : ''}>Multiple</option></select>
+      </label>
+      <label>At <input name="lhAt" type="number" min="0.5" max="5" step="0.05" value="${a.lineHeight || 1.15}"></label>
+      <h4>Tab stops</h4>
+      <ul class="tab-list" id="tabList">${stopsHtml()}</ul>
+      <div class="tab-add">
+        <input name="tabPos" type="number" min="0" step="${lenStep}" placeholder="Position (${UNIT})">
+        <select name="tabAlign"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select>
+        <button type="button" class="txt-btn sm" id="tabAdd">Add</button>
+        <button type="button" class="txt-btn sm" id="tabClear">Clear all</button>
+      </div>
+    </div>`, {
+    okText: 'Apply',
+    onOpen: (b) => {
+      const list = b.querySelector('#tabList');
+      const redraw = () => { list.innerHTML = stopsHtml(); };
+      b.querySelector('#tabAdd').addEventListener('click', () => {
+        const v = parseFloat($('[name=tabPos]', b).value);
+        if (!(v > 0)) return;
+        const pos = +fromDisplay(v).toFixed(4);
+        stops = stops.filter((t) => Math.abs(t.pos - pos) > 0.01).concat({ pos, align: $('[name=tabAlign]', b).value }).sort((x, y) => x.pos - y.pos);
+        $('[name=tabPos]', b).value = '';
+        redraw();
+      });
+      b.querySelector('#tabClear').addEventListener('click', () => { stops = []; redraw(); });
+      list.addEventListener('click', (e) => {
+        const rm = e.target.closest('[data-rm]');
+        if (rm) { stops.splice(+rm.dataset.rm, 1); redraw(); }
+      });
+    },
+  });
+  if (!body) return;
+  const num = (name) => Math.max(0, parseFloat($(`[name=${name}]`, body).value) || 0);
+  const special = $('[name=special]', body).value;
+  const by = +fromDisplay(num('by')).toFixed(4);
+  const lhSel = $('[name=lh]', body).value;
+  chain().setTextAlign($('[name=align]', body).value).setParagraphFormat({
+    leftIndent: +fromDisplay(num('left')).toFixed(4),
+    rightIndent: +fromDisplay(num('right')).toFixed(4),
+    firstLine: special === 'first' ? by : special === 'hanging' ? -by : 0,
+    spaceBefore: num('before'),
+    spaceAfter: num('after'),
+    lineHeight: lhSel === 'multiple' ? String(num('lhAt') || 1.15) : lhSel || null,
+    tabStops: stops.length ? stops : null,
+  }).run();
 }
 
 // ---------- Dialogs ----------
@@ -663,9 +861,19 @@ function applySettings() {
   $('#pageHeader').textContent = s.header || '';
   $('#footerText').textContent = s.footer || '';
   $('#pageNumLabel').classList.toggle('hidden', !s.pageNumbers);
+  pageEl.classList.toggle('has-page-color', !!s.pageColor);
+  if (s.pageColor) {
+    pageEl.style.setProperty('--page-bg', s.pageColor);
+    pageEl.style.setProperty('--page-text', isDarkColor(s.pageColor) ? '#f1f5f9' : '#1e293b');
+    pageEl.style.setProperty('--heading', isDarkColor(s.pageColor) ? '#5eead4' : '#0f5e57');
+  } else {
+    ['--page-bg', '--page-text', '--heading'].forEach((v) => pageEl.style.removeProperty(v));
+  }
   const q = (t) => `"${String(t).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\A ')}"`;
   pageStyle.textContent = `@media print {
+    ${s.pageColor ? `html, body { background: ${s.pageColor} !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }` : ''}
     @page { size: ${size.css} ${landscape ? 'landscape' : 'portrait'}; margin: ${m.top}in ${m.right}in ${m.bottom}in ${m.left}in;
+      ${s.pageColor ? `background: ${s.pageColor};` : ''}
       ${s.header ? `@top-center { content: ${q(s.header)}; color: #666; font: 10pt Helvetica, Arial, sans-serif; white-space: pre; }` : ''}
       ${s.footer || s.pageNumbers ? `@bottom-center { content: ${s.footer ? q(s.footer) : '""'} ${s.footer && s.pageNumbers ? '"  ·  "' : ''} ${s.pageNumbers ? '"Page " counter(page) " of " counter(pages)' : ''}; color: #666; font: 10pt Helvetica, Arial, sans-serif; }` : ''}
     }
@@ -692,7 +900,13 @@ function updateSettings(patch) {
 let layoutRaf = 0;
 function scheduleLayout() {
   cancelAnimationFrame(layoutRaf);
-  layoutRaf = requestAnimationFrame(paginate);
+  layoutRaf = requestAnimationFrame(() => { layoutTabs(editor.view.dom); paginate(); });
+}
+
+let tabsRaf = 0;
+function scheduleTabs() {
+  cancelAnimationFrame(tabsRaf);
+  tabsRaf = requestAnimationFrame(() => layoutTabs(editor.view.dom));
 }
 
 // Estimate where printed pages begin and mark them on the continuous sheet.
@@ -908,6 +1122,7 @@ function loadIntoEditor(doc) {
   doc.settings = { ...DEFAULT_SETTINGS, ...(doc.settings || {}) };
   $('#docTitle').value = doc.title;
   document.title = `${doc.title} — Dynoword`;
+  if (doc.content) migrateIndent(doc.content);
   editor.commands.setContent(doc.content || doc.html || '<p></p>', { emitUpdate: false });
   editor.commands.setSearchTerm('');
   applySettings();
@@ -1094,6 +1309,8 @@ async function boot() {
   buildPalettes();
 
   const small = window.matchMedia('(max-width: 760px)').matches;
+  try { state.showRuler = (localStorage.getItem('dw-ruler') ?? '1') === '1'; } catch { state.showRuler = true; }
+  document.body.classList.toggle('no-ruler', !state.showRuler);
   setLayout(small ? 'web' : 'print');
   if (!small) setZoom(+(localStorage.getItem('dw-zoom') || 100));
 

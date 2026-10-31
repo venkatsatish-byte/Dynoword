@@ -112,7 +112,8 @@ export async function readFile(file) {
         ],
       },
     );
-    return { name, html: result.value };
+    // Word tab characters arrive as \t; turn them into tab nodes so their stops still line up.
+    return { name, html: result.value.replace(/\t/g, '<span data-tab></span>') };
   }
   const text = await file.text();
   if (ext === 'html' || ext === 'htm') {
@@ -143,7 +144,8 @@ export function standaloneHtml(title, bodyHtml, settings) {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <style>
-body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12pt;line-height:1.35;max-width:6.5in;margin:1in auto;padding:0 16px;color:#222;column-count:${settings.columns || 1}}
+body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12pt;line-height:1.35;max-width:6.5in;margin:1in auto;padding:0 16px;color:#222;column-count:${settings.columns || 1};tab-size:0.5in;background:${settings.pageColor || '#fff'}}
+.tab{white-space:pre}
 p{margin:0 0 8pt}h1,h2,h3{color:#0f5e57;font-weight:700}h1.doc-title{font-size:28pt;font-weight:600;color:#1e293b}
 table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:4px 8px;vertical-align:top}th{background:#e6f4f1}
 blockquote{border-left:3px solid #bbb;margin-left:0;padding-left:12px;color:#555;font-style:italic}

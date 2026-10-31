@@ -1,11 +1,16 @@
 import {
   AlignmentType, BorderStyle, CommentRangeEnd, CommentRangeStart, CommentReference, Document,
   ExternalHyperlink, Footer, Header, HeadingLevel, ImageRun, LevelFormat, PageBreak, PageNumber,
-  PageOrientation, Packer, Paragraph, ShadingType, Table, TableCell, TableRow, TextRun, WidthType,
+  PageOrientation, Packer, Paragraph, ShadingType, Tab, Table, TableCell, TableRow, TabStopType, TextRun, WidthType,
 } from 'docx';
 import { PAGE_SIZES, MARGINS } from './page.js';
 
 const TWIP_PER_IN = 1440;
+const tw = (inches) => Math.round(inches * TWIP_PER_IN);
+const BORDER_SIDES = {
+  bottom: ['bottom'], top: ['top'], topbottom: ['top', 'bottom'], left: ['left'], box: ['top', 'bottom', 'left', 'right'],
+};
+const TAB_TYPES = { left: TabStopType.LEFT, center: TabStopType.CENTER, right: TabStopType.RIGHT };
 const PX_PER_IN = 96;
 
 const ALIGN = {
@@ -106,6 +111,7 @@ class Converter {
     let openComments = new Map();
     nodes.forEach((node, idx) => {
       if (node.type === 'hardBreak') { out.push(new TextRun({ break: 1, ...extra })); return; }
+      if (node.type === 'tab') { out.push(new TextRun({ children: [new Tab()], ...extra })); return; }
       if (node.type === 'image') { const r = this.imageRun(node); if (r) out.push(r); return; }
       if (node.type !== 'text') return;
 
@@ -186,8 +192,26 @@ class Converter {
     const a = node.attrs || {};
     const opts = {};
     if (a.textAlign && ALIGN[a.textAlign]) opts.alignment = ALIGN[a.textAlign];
-    if (a.lineHeight) opts.spacing = { line: Math.round(parseFloat(a.lineHeight) * 240) };
-    if (a.indent) opts.indent = { left: a.indent * 720 };
+    const spacing = {};
+    if (a.lineHeight) spacing.line = Math.round(parseFloat(a.lineHeight) * 240);
+    if (a.spaceBefore != null) spacing.before = Math.round(a.spaceBefore * 20);
+    if (a.spaceAfter != null) spacing.after = Math.round(a.spaceAfter * 20);
+    if (Object.keys(spacing).length) opts.spacing = spacing;
+    const indent = {};
+    if (a.leftIndent) indent.left = tw(a.leftIndent);
+    if (a.rightIndent) indent.right = tw(a.rightIndent);
+    if (a.firstLine > 0) indent.firstLine = tw(a.firstLine);
+    if (a.firstLine < 0) indent.hanging = tw(-a.firstLine);
+    if (Object.keys(indent).length) opts.indent = indent;
+    if (a.border && BORDER_SIDES[a.border]) {
+      opts.border = Object.fromEntries(BORDER_SIDES[a.border].map((side) => [side, {
+        style: BorderStyle.SINGLE, size: a.border === 'left' ? 18 : 6, color: 'auto', space: a.border === 'left' ? 6 : 2,
+      }]));
+    }
+    if (a.shading) opts.shading = { type: ShadingType.CLEAR, fill: toHex(a.shading), color: 'auto' };
+    if (a.tabStops?.length) {
+      opts.tabStops = a.tabStops.map((t) => ({ type: TAB_TYPES[t.align] || TabStopType.LEFT, position: tw(t.pos) }));
+    }
     return opts;
   }
 
@@ -316,7 +340,6 @@ export async function exportDocx(json, settings) {
   const size = PAGE_SIZES[settings.pageSize] || PAGE_SIZES.letter;
   const m = MARGINS[settings.margins] || MARGINS.normal;
   const landscape = settings.orientation === 'landscape';
-  const tw = (inches) => Math.round(inches * TWIP_PER_IN);
 
   const footerChildren = settings.footer ? textParagraphs(settings.footer) : [];
   if (settings.pageNumbers) {
@@ -328,6 +351,7 @@ export async function exportDocx(json, settings) {
 
   const doc = new Document({
     creator: 'Dynoword',
+    background: settings.pageColor ? { color: toHex(settings.pageColor) } : undefined,
     title: settings.title || 'Document',
     comments: { children: conv.comments },
     numbering: { config: numberingConfig() },

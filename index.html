@@ -119,7 +119,12 @@
               <button data-cmd="orderedList" data-active="orderedList" title="Numbering"><i data-lucide="list-ordered"></i></button>
               <button data-cmd="taskList" data-active="taskList" title="Checklist"><i data-lucide="list-todo"></i></button>
               <button data-cmd="outdent" title="Decrease indent (Shift+Tab)"><i data-lucide="indent-decrease"></i></button>
-              <button data-cmd="indent" title="Increase indent (Tab)"><i data-lucide="indent-increase"></i></button>
+              <button data-cmd="indent" title="Increase indent"><i data-lucide="indent-increase"></i></button>
+              <div class="color-btn" title="Paragraph shading">
+                <button data-cmd="shading" class="color-main"><i data-lucide="paint-bucket"></i><span class="swatch" id="shadeSwatch" style="background:#e2e8f0"></span></button>
+                <button data-menu="shadeMenu" class="color-drop"><i data-lucide="chevron-down"></i></button>
+                <div class="menu palette" id="shadeMenu" data-palette="shading"></div>
+              </div>
             </div>
             <div class="row">
               <button data-cmd="align:left" data-active="align:left" title="Align left (Ctrl+L)"><i data-lucide="align-left"></i></button>
@@ -135,6 +140,22 @@
                   <button data-cmd="lineHeight:2">2.0</button>
                   <button data-cmd="lineHeight:2.5">2.5</button>
                   <button data-cmd="lineHeight:3">3.0</button>
+                  <hr class="menu-sep">
+                  <button data-cmd="paraSpace:before">Add / remove space before paragraph</button>
+                  <button data-cmd="paraSpace:after">Add / remove space after paragraph</button>
+                  <button data-cmd="paragraphDialog">Line spacing options…</button>
+                </div>
+              </div>
+              <div class="menu-wrap">
+                <button data-menu="borderMenu" title="Paragraph borders"><i data-lucide="square-dashed-bottom"></i></button>
+                <div class="menu" id="borderMenu">
+                  <button data-cmd="border:bottom">Bottom border</button>
+                  <button data-cmd="border:top">Top border</button>
+                  <button data-cmd="border:topbottom">Top and bottom borders</button>
+                  <button data-cmd="border:left">Left bar</button>
+                  <button data-cmd="border:box">Box border</button>
+                  <hr class="menu-sep">
+                  <button data-cmd="border:none">No border</button>
                 </div>
               </div>
             </div>
@@ -247,14 +268,27 @@
                 <button data-cmd="columns:3">Three</button>
               </div>
             </div>
+            <div class="menu-wrap">
+              <button class="big-btn" data-menu="pageColorMenu"><i data-lucide="paint-bucket"></i><span>Page colour</span></button>
+              <div class="menu palette" id="pageColorMenu" data-palette="page"></div>
+            </div>
+            <button class="big-btn" data-cmd="pageBreak"><i data-lucide="separator-horizontal"></i><span>Break</span></button>
           </div>
           <div class="group-label">Page Setup</div>
         </div>
         <div class="group">
           <div class="group-body">
-            <button class="big-btn" data-cmd="pageBreak"><i data-lucide="separator-horizontal"></i><span>Break</span></button>
-            <button class="big-btn" data-cmd="indent"><i data-lucide="indent-increase"></i><span>Indent</span></button>
-            <button class="big-btn" data-cmd="outdent"><i data-lucide="indent-decrease"></i><span>Outdent</span></button>
+            <div class="spin-col">
+              <div class="spin-head">Indent</div>
+              <label class="spin"><span>Left</span><input type="number" id="indLeft" data-para="leftIndent" min="0" max="20" step="0.1" inputmode="decimal"><em class="unit-len"></em></label>
+              <label class="spin"><span>Right</span><input type="number" id="indRight" data-para="rightIndent" min="0" max="20" step="0.1" inputmode="decimal"><em class="unit-len"></em></label>
+            </div>
+            <div class="spin-col">
+              <div class="spin-head">Spacing</div>
+              <label class="spin"><span>Before</span><input type="number" id="spBefore" data-para="spaceBefore" min="0" max="999" step="6" inputmode="decimal"><em>pt</em></label>
+              <label class="spin"><span>After</span><input type="number" id="spAfter" data-para="spaceAfter" min="0" max="999" step="6" inputmode="decimal"><em>pt</em></label>
+            </div>
+            <button class="big-btn" data-cmd="paragraphDialog" title="Paragraph settings: indents, spacing, line spacing and tabs"><i data-lucide="pilcrow"></i><span>Paragraph…</span></button>
           </div>
           <div class="group-label">Paragraph</div>
         </div>
@@ -297,6 +331,7 @@
         </div>
         <div class="group">
           <div class="group-body">
+            <button class="big-btn" data-cmd="ruler" data-toggle="ruler"><i data-lucide="ruler"></i><span>Ruler</span></button>
             <button class="big-btn" data-cmd="navPane" data-toggle="navPane"><i data-lucide="list-tree"></i><span>Navigation</span></button>
             <button class="big-btn" data-cmd="showComments" data-toggle="commentsPane"><i data-lucide="message-square"></i><span>Comments</span></button>
           </div>
@@ -373,7 +408,9 @@
 
       <div class="canvas" id="canvas">
         <div class="zoomer" id="zoomer">
+          <div class="ruler" id="ruler" aria-label="Ruler"></div>
           <div class="page" id="page">
+            <div class="ruler-guide" id="rulerGuide"></div>
             <div class="page-header" id="pageHeader" contenteditable="true" data-placeholder="Header" spellcheck="true"></div>
             <div id="editor"></div>
             <div class="page-footer" id="pageFooter">
@@ -477,7 +514,7 @@
 
   <!-- Dialogs -->
   <dialog id="dlg">
-    <form method="dialog" class="dlg-form">
+    <form method="dialog" class="dlg-form" novalidate>
       <h3 id="dlgTitle"></h3>
       <div id="dlgBody"></div>
       <div class="dlg-actions">
