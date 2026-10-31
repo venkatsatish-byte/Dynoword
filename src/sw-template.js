@@ -19,8 +19,9 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   if (req.mode === 'navigate') {
     // Network first for the page so updates arrive; fall back to the cached shell offline.
-    event.respondWith(fetch(req).catch(() => caches.match('./', { ignoreSearch: true })));
+    event.respondWith(fetch(req).catch(() => caches.match('./', { ignoreSearch: true, ignoreVary: true })));
     return;
   }
-  event.respondWith(caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req)));
+  // ignoreVary: module scripts are requested in CORS mode (with an Origin header), unlike the precache requests.
+  event.respondWith(caches.match(req, { ignoreSearch: true, ignoreVary: true }).then((hit) => hit || fetch(req)));
 });

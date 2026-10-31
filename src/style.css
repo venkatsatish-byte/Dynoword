@@ -171,6 +171,25 @@ select {
 .custom-color { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; cursor: pointer; }
 .custom-color input { width: 32px; height: 24px; border: 0; padding: 0; background: none; }
 
+/* Trial / subscription banner */
+.plan-banner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px calc(12px + var(--safe-right)) 6px calc(12px + var(--safe-left));
+  background: var(--accent-soft); color: var(--text); border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.plan-banner[data-tone="warn"] { background: color-mix(in srgb, #f59e0b 18%, var(--chrome)); }
+.plan-banner span { flex: 1 1 240px; }
+.primary-btn.sm { height: 30px; padding: 0 12px; font-size: 13px; }
+.read-only .doc-body { caret-color: transparent; }
+
+/* Account panel */
+.account-body { max-width: 520px; }
+.signin-form { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.signin-form .primary-btn, .signin-form .txt-btn { align-self: flex-start; }
+.account-info { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 16px; }
+.account-info dt { color: var(--muted); }
+.account-info dd { margin: 0; font-weight: 600; }
+.account-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
 /* Find bar */
 .findbar {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px calc(12px + var(--safe-right)) 6px calc(12px + var(--safe-left));

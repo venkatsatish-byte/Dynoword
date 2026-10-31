@@ -20,6 +20,7 @@ import { saveDoc, getDoc, listDocs, deleteDoc, newId } from './storage.js';
 import { readFile, download, safeFilename, standaloneHtml, htmlToMarkdown } from './io.js';
 import { TEMPLATES } from './templates.js';
 import { analyze, matchKeywords, cleanJson, headerParagraphs, insertAfterName, atsDocument } from './ats.js';
+import * as billing from './billing.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -80,8 +81,9 @@ const editor = new Editor({
   ],
   editorProps: {
     attributes: { class: 'doc-body', spellcheck: 'true', 'aria-label': 'Document' },
-    handlePaste: (view, event) => insertImageFiles(event.clipboardData?.files),
+    handlePaste: (view, event) => (editable() ? insertImageFiles(event.clipboardData?.files) : true),
     handleDrop: (view, event) => {
+      if (!editable()) { promptUpgrade(); return true; }
       const files = event.dataTransfer?.files;
       if (files?.length && /\.(docx|html?|txt|md)$/i.test(files[0].name)) {
         openFiles(files[0]);
@@ -285,6 +287,11 @@ const commands = {
   print: () => { closeHub(); setTimeout(() => window.print(), 50); },
   share,
   install: () => state.installPrompt?.prompt(),
+  account: () => openHub('account'),
+  signIn: () => openHub('account'),
+  subscribe: () => billingAction(billing.subscribe),
+  manageBilling: () => billingAction(billing.manageBilling),
+  signOut: () => billingAction(billing.signOut),
 };
 
 const paramCommands = {
@@ -309,9 +316,15 @@ const paramCommands = {
   export: exportAs,
 };
 
+// Commands that only read, export or change the view, so they work while the document is read-only.
+const READ_ONLY_OK = new Set(['openHub', 'closeHub', 'print', 'share', 'copy', 'find', 'closeFind', 'findNext', 'findPrev',
+  'wordCount', 'readAloud', 'zoomIn', 'zoomOut', 'zoom', 'layout', 'focus', 'toggleTheme', 'toggleRibbon', 'navPane',
+  'showComments', 'atsPane', 'ruler', 'install', 'export', 'account', 'signIn', 'subscribe', 'manageBilling', 'signOut']);
+
 function run(cmd) {
   closeMenus();
   const [name, arg] = cmd.split(/:(.*)/s);
+  if (!READ_ONLY_OK.has(name) && !editable()) return promptUpgrade();
   if (arg !== undefined && paramCommands[name]) return paramCommands[name](arg);
   if (commands[name]) return commands[name]();
   console.warn('Unknown command', cmd);
@@ -368,6 +381,7 @@ function buildPalettes() {
       <button class="none-btn" data-color="">${kind === 'color' ? 'Automatic' : 'No colour'}</button>
       <label class="custom-color">More colours… <input type="color" value="${initial}"></label>`;
     const apply = (c) => {
+      if (!guard()) return closeMenus();
       if (kind === 'color') {
         if (c) { state.textColor = c; $('#colorSwatch').style.background = c; chain().setColor(c).run(); } else chain().unsetColor().run();
       } else if (kind === 'highlight') {
@@ -389,10 +403,12 @@ function buildPalettes() {
 }
 
 $('#fontFamily').addEventListener('change', (e) => {
+  if (!guard()) return updateToolbar();
   const v = e.target.value;
   v ? chain().setFontFamily(v).run() : chain().unsetFontFamily().run();
 });
 $('#fontSize').addEventListener('change', (e) => {
+  if (!guard()) return updateToolbar();
   const v = e.target.value;
   v ? chain().setFontSize(`${v}pt`).run() : chain().unsetFontSize().run();
 });
@@ -502,7 +518,7 @@ const ruler = createRuler($('#ruler'), {
     const a = n.attrs;
     return { leftIndent: a.leftIndent || 0, rightIndent: a.rightIndent || 0, firstLine: a.firstLine || 0, tabStops: a.tabStops || [] };
   },
-  onChange: (attrs) => chain().setParagraphFormat(attrs).run(),
+  onChange: (attrs) => (guard() ? chain().setParagraphFormat(attrs).run() : ruler.render()),
   guide: $('#rulerGuide'),
 });
 
@@ -523,6 +539,7 @@ function updateParagraphControls() {
 $$('[data-para]').forEach((input) => {
   if (input.dataset.para.endsWith('Indent')) input.step = UNIT === 'cm' ? '0.25' : '0.1';
   input.addEventListener('change', () => {
+    if (!guard()) return updateToolbar();
     const key = input.dataset.para;
     let v = Math.max(0, parseFloat(input.value) || 0);
     if (key.endsWith('Indent')) v = +fromDisplay(v).toFixed(4);
@@ -838,7 +855,7 @@ function refreshComments() {
 $('#commentList').addEventListener('click', (e) => {
   const card = e.target.closest('.comment-card');
   if (!card) return;
-  if (e.target.closest('[data-act=resolve]')) { editor.commands.removeComment(card.dataset.id); return; }
+  if (e.target.closest('[data-act=resolve]')) { if (guard()) editor.commands.removeComment(card.dataset.id); return; }
   chain().setTextSelection({ from: +card.dataset.from, to: +card.dataset.to }).scrollIntoView().run();
 });
 
@@ -900,6 +917,7 @@ function replaceDocJson(json) {
 }
 
 function applyAtsFix(check) {
+  if (!guard()) return;
   const json = editor.getJSON();
   switch (check.fix) {
     case 'columns': updateSettings({ columns: 1 }); break;
@@ -1354,13 +1372,204 @@ $('#hub').addEventListener('click', async (e) => {
   }
 });
 
-async function openHub() {
+async function openHub(panel = 'home') {
   await persist();
   await renderRecent();
+  renderAccount();
+  $$('[data-bs]').forEach((b) => b.classList.toggle('active', b.dataset.bs === panel));
+  $$('[data-bs-panel]').forEach((p) => p.classList.toggle('active', p.dataset.bsPanel === panel));
   $('#hub').classList.remove('hidden');
   layoutTabs($('#hub'));
 }
 function closeHub() { $('#hub').classList.add('hidden'); }
+
+// ---------- Plan: free trial, subscription, read-only ----------
+
+state.access = billing.initialAccess();
+const editable = () => billing.canEdit(state.access);
+
+function guard() {
+  if (editable()) return true;
+  promptUpgrade();
+  return false;
+}
+
+async function promptUpgrade() {
+  const a = state.access;
+  if (a.status === 'signedOut') {
+    toast(`Sign in to start your free ${billing.TRIAL_DAYS}-day trial`);
+    openHub('account');
+    return;
+  }
+  const lapsed = a.status === 'active';
+  const body = await dialog(lapsed ? 'Your subscription has ended' : 'Your free trial has ended', `
+    <p>Your documents are read-only. You can still open, read, print, export and share them.</p>
+    <p>Subscribe for <b>${billing.PRICE}</b> to keep editing on all your devices. Cancel any time.</p>`, { okText: `Subscribe — ${billing.PRICE}` });
+  if (body) billingAction(billing.subscribe);
+}
+
+async function billingAction(fn) {
+  try {
+    toast('One moment…');
+    await fn();
+  } catch (e) {
+    toast(e.message || 'Something went wrong');
+  }
+}
+
+// Typing or formatting shortcuts in a read-only document explain why nothing happens (at most every few seconds).
+let lastPrompt = 0;
+document.addEventListener('keydown', (e) => {
+  if (editable() || e.target.closest?.('input, textarea, select, dialog, [contenteditable="true"]')) return;
+  const mod = e.metaKey || e.ctrlKey;
+  const edits = mod ? 'biuzyvxk'.includes(e.key.toLowerCase()) : e.key.length === 1 || ['Enter', 'Backspace', 'Delete', 'Tab'].includes(e.key);
+  if (!edits) return;
+  e.preventDefault();
+  if (Date.now() - lastPrompt > 4000) { lastPrompt = Date.now(); promptUpgrade(); }
+});
+
+function applyAccess(access) {
+  state.access = access;
+  const can = editable();
+  editor.setEditable(can, false);
+  $('#docTitle').readOnly = !can;
+  ['pageHeader', 'footerText'].forEach((id) => document.getElementById(id).setAttribute('contenteditable', String(can)));
+  document.body.classList.toggle('read-only', !can);
+  $('#accountBtn').classList.toggle('hidden', !billing.BILLING_ENABLED);
+  renderPlanBanner();
+  renderAccount();
+  updateToolbar();
+}
+
+function renderPlanBanner() {
+  const a = state.access;
+  const date = (t) => new Date(t).toLocaleDateString(undefined, { dateStyle: 'medium' });
+  let text = '';
+  let action = null;
+  let tone = 'info';
+  switch (a.status) {
+    case 'signedOut':
+      text = `Sign in with your email to start your free ${billing.TRIAL_DAYS}-day trial. Until then documents are read-only.`;
+      action = ['Sign in', 'signIn'];
+      break;
+    case 'trial': {
+      const left = billing.daysLeft(a);
+      text = left > 0 ? `Free trial: ${left} day${left === 1 ? '' : 's'} left.` : 'Your free trial ends today.';
+      action = [`Subscribe — ${billing.PRICE}`, 'subscribe'];
+      break;
+    }
+    case 'active':
+      if (!editable()) { text = 'Your subscription has ended — documents are read-only.'; action = ['Subscribe', 'subscribe']; tone = 'warn'; }
+      else if (a.paymentIssue) { text = 'There’s a problem with your payment. Update your card to keep editing.'; action = ['Update card', 'manageBilling']; tone = 'warn'; }
+      else if (a.cancelAtPeriodEnd) { text = `Your subscription ends on ${date(a.until)}.`; action = ['Renew', 'manageBilling']; }
+      break;
+    case 'expired':
+      text = `Your free trial has ended — documents are read-only. Subscribe for ${billing.PRICE} to keep editing.`;
+      action = ['Subscribe', 'subscribe'];
+      tone = 'warn';
+      break;
+    case 'error':
+      text = `Couldn’t check your subscription (${a.error}). You can keep working.`;
+      break;
+    default:
+      break;
+  }
+  if (a.offline && text) text += ' (offline)';
+  const banner = $('#planBanner');
+  banner.classList.toggle('hidden', !text);
+  banner.dataset.tone = tone;
+  $('#planText').textContent = text;
+  const btn = $('#planAction');
+  btn.classList.toggle('hidden', !action);
+  if (action) { btn.textContent = action[0]; btn.dataset.cmd = action[1]; }
+}
+
+function renderAccount() {
+  const el = $('#accountBody');
+  if (!el) return;
+  const a = state.access;
+  const date = (t) => new Date(t).toLocaleDateString(undefined, { dateStyle: 'long' });
+  if (!billing.BILLING_ENABLED) {
+    el.innerHTML = '<p class="muted">Dynoword is free to use here. No account is needed.</p>';
+    return;
+  }
+  if (a.status === 'signedOut' || a.status === 'loading') {
+    el.innerHTML = `
+      <p>Sign in to start your <b>free ${billing.TRIAL_DAYS}-day trial</b>. After that, Dynoword is <b>${billing.PRICE}</b> — cancel any time.
+      Without a subscription your documents stay readable and you can always export them.</p>
+      <form class="signin-form" id="signinForm">
+        <label class="field">Email address <input type="email" name="email" required autocomplete="email" inputmode="email" placeholder="you@example.com"></label>
+        <button class="primary-btn" type="submit">Email me a sign-in link</button>
+      </form>
+      <div class="signin-sent hidden" id="signinSent">
+        <p><b>Check your email.</b> Open the link we sent on this device to finish signing in.</p>
+        <p class="muted">Using the installed app on iPhone or iPad? Copy the link from the email and paste it here:</p>
+        <form class="signin-form" id="pasteForm">
+          <label class="field">Sign-in link <input name="link" required placeholder="https://…"></label>
+          <button class="txt-btn" type="submit">Finish signing in</button>
+        </form>
+      </div>`;
+    return;
+  }
+  const plan = {
+    trial: `Free trial — ends ${date(a.until)}`,
+    active: a.cancelAtPeriodEnd ? `Subscribed — ends ${date(a.until)}` : `Subscribed (${billing.PRICE}) — renews ${a.until ? date(a.until) : ''}`,
+    expired: 'Free trial ended — documents are read-only',
+    error: `Couldn’t check your plan: ${a.error}`,
+  }[a.status] || '';
+  el.innerHTML = `
+    <dl class="account-info">
+      <dt>Signed in as</dt><dd>${escapeHtml(a.email || '')}</dd>
+      <dt>Plan</dt><dd>${escapeHtml(plan)}</dd>
+    </dl>
+    <div class="account-actions">
+      ${a.status === 'active' ? '<button class="primary-btn" data-cmd="manageBilling">Manage billing</button>'
+        : `<button class="primary-btn" data-cmd="subscribe">Subscribe — ${billing.PRICE}</button>`}
+      <button class="txt-btn" data-cmd="signOut">Sign out</button>
+    </div>
+    <p class="muted tiny">Payments are handled securely by Stripe. Cancel any time from Manage billing.</p>`;
+}
+
+$('#hub').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const button = form.querySelector('button');
+  button.disabled = true;
+  try {
+    if (form.id === 'signinForm') {
+      await billing.sendSignInLink(form.email.value.trim());
+      form.classList.add('hidden');
+      $('#signinSent').classList.remove('hidden');
+    } else if (form.id === 'pasteForm') {
+      await billing.finishSignIn(form.link.value.trim());
+      toast('Signed in');
+    }
+  } catch (err) {
+    toast(err.message || 'Something went wrong');
+  } finally {
+    button.disabled = false;
+  }
+});
+
+async function askEmailForLink(link) {
+  const body = await dialog('Finish signing in', `
+    <p>Enter the email address the sign-in link was sent to.</p>
+    <label class="field">Email address <input type="email" name="email" autocomplete="email" autofocus></label>`, { okText: 'Sign in' });
+  if (!body) return;
+  try {
+    await billing.finishSignIn(link, $('[name=email]', body).value.trim());
+    toast('Signed in');
+  } catch (err) {
+    toast(err.message || 'Sign-in failed');
+  }
+}
+
+function handleCheckoutReturn() {
+  const result = new URLSearchParams(location.search).get('checkout');
+  if (!result) return;
+  history.replaceState(null, '', location.pathname);
+  toast(result === 'success' ? 'Thanks for subscribing! Editing is unlocked.' : 'Checkout cancelled — you weren’t charged.');
+}
 
 // ---------- Keyboard ----------
 
@@ -1384,6 +1593,7 @@ document.addEventListener('keydown', (e) => {
   };
   if (e.shiftKey || (e.altKey && k !== 'n')) return;
   const fn = map[k];
+  if (fn && !['s', 'p', 'f'].includes(k) && !editable()) { e.preventDefault(); promptUpgrade(); return; }
   if (fn) { e.preventDefault(); fn(); }
 });
 
@@ -1432,6 +1642,14 @@ async function boot() {
   } catch {}
   if (doc) loadIntoEditor(doc);
   else await newDocument('blank');
+
+  applyAccess(state.access);
+  handleCheckoutReturn();
+  billing.start({ onChange: applyAccess, needEmail: askEmailForLink }).catch((e) => applyAccess({ status: 'error', error: e.message }));
+  // Re-check the plan when the app comes back to the foreground (e.g. after paying in another tab).
+  document.addEventListener('visibilitychange', async () => {
+    if (!document.hidden && state.access.signedIn) applyAccess(await billing.refresh());
+  });
 
   // Files opened from the OS ("Open with Dynoword") on installed desktop apps.
   if ('launchQueue' in window) {
