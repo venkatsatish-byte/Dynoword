@@ -32,6 +32,14 @@ comments pane with resolve.
 **View** – print layout with page markers, web layout, focus mode, navigation pane (heading outline),
 zoom (50–200 %, pinch-to-zoom on touch screens, fit page width), dark mode.
 
+**Résumés & ATS** – an ATS résumé template and an **ATS check** pane (Review tab) that scores how
+easily applicant tracking systems can read your résumé and flags contact details hidden in headers,
+multi-column layouts, tables, images, unstyled section titles, missing standard sections, missing
+dates, uncommon fonts, tiny text, emoji and length, with one-click fixes for most. Paste a job
+description to see which of its keywords you already use and which are missing. **Download
+ATS-ready .docx** saves a clean single-column copy without tables, images or comments, leaving your
+document unchanged.
+
 **Table tools** – insert/delete rows and columns, merge/split cells, header row, resizable columns.
 
 **Files** – autosave, recent documents, templates (letter, resume, report, meeting notes).

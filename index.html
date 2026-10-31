@@ -317,6 +317,13 @@
           </div>
           <div class="group-label">Comments</div>
         </div>
+        <div class="group">
+          <div class="group-body">
+            <button class="big-btn" data-cmd="atsPane" data-toggle="atsPane" title="Check how well applicant tracking systems can read your résumé"><i data-lucide="scan-search"></i><span>ATS check</span></button>
+            <button class="big-btn" data-cmd="export:ats" title="Download a clean copy for job applications"><i data-lucide="file-check"></i><span>ATS .docx</span></button>
+          </div>
+          <div class="group-label">Résumé</div>
+        </div>
       </div>
 
       <!-- VIEW -->
@@ -421,6 +428,23 @@
         </div>
       </div>
 
+      <aside class="side-pane right hidden ats-pane" id="atsPane">
+        <div class="pane-head"><span>ATS check</span><button data-cmd="atsPane"><i data-lucide="x"></i></button></div>
+        <div class="pane-body">
+          <div class="ats-score">
+            <div class="ats-ring" id="atsRing"><span id="atsScore">–</span></div>
+            <div><b id="atsVerdict">Checking…</b><small>How easily applicant tracking systems can read this résumé</small></div>
+          </div>
+          <button class="primary-btn full" data-cmd="export:ats"><i data-lucide="file-check"></i> Download ATS-ready .docx</button>
+          <p class="muted tiny">A clean copy: one column, no tables, images or comments, standard fonts and headings. Your document stays as it is.</p>
+          <h4>Checks</h4>
+          <ul class="ats-list" id="atsList"></ul>
+          <h4>Match a job description</h4>
+          <textarea id="jdInput" rows="6" placeholder="Paste the job posting here…" aria-label="Job description"></textarea>
+          <div id="jdResult"></div>
+        </div>
+      </aside>
+
       <aside class="side-pane right hidden" id="commentsPane">
         <div class="pane-head"><span>Comments</span><button data-cmd="showComments"><i data-lucide="x"></i></button></div>
         <div class="pane-body" id="commentList"></div>
@@ -458,6 +482,7 @@
           <button class="tpl" data-cmd="new:blank"><div class="tpl-thumb"></div><span>Blank document</span></button>
           <button class="tpl" data-cmd="new:letter"><div class="tpl-thumb lines"></div><span>Letter</span></button>
           <button class="tpl" data-cmd="new:resume"><div class="tpl-thumb resume"></div><span>Resume</span></button>
+          <button class="tpl" data-cmd="new:atsResume"><div class="tpl-thumb resume ats"></div><span>ATS résumé</span></button>
           <button class="tpl" data-cmd="new:report"><div class="tpl-thumb report"></div><span>Report</span></button>
           <button class="tpl" data-cmd="new:notes"><div class="tpl-thumb notes"></div><span>Meeting notes</span></button>
         </div>
@@ -475,6 +500,7 @@
         <h2>Save a copy</h2>
         <p class="muted">Your work saves automatically on this device. Download a copy to share or keep elsewhere.</p>
         <div class="export-list">
+          <button data-cmd="export:ats"><i data-lucide="file-check"></i><div><b>ATS-ready résumé (.docx)</b><span>Clean single-column copy for job applications</span></div></button>
           <button data-cmd="export:docx"><i data-lucide="file-text"></i><div><b>Office Open XML document (.docx)</b><span>The standard format most word processors open</span></div></button>
           <button data-cmd="print"><i data-lucide="printer"></i><div><b>PDF</b><span>Use “Save as PDF” in the print dialog</span></div></button>
           <button data-cmd="export:html"><i data-lucide="code"></i><div><b>Web page (.html)</b><span>Keeps all formatting</span></div></button>
