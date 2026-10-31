@@ -1,0 +1,42 @@
+:root {
+  --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0;
+  --accent: #0f766e; --fill-bg: #fef3c7; --fill-text: #78350f;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1120; --card: #111827; --text: #e2e8f0; --muted: #94a3b8; --border: #334155;
+    --accent: #2dd4bf; --fill-bg: #713f12; --fill-text: #fef3c7; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+header {
+  display: flex; align-items: center; gap: 10px; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
+  border-bottom: 1px solid var(--border); background: var(--card);
+}
+header a { display: flex; align-items: center; gap: 8px; color: var(--accent); font-weight: 700; text-decoration: none; }
+nav { margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap; font-size: 14px; }
+nav a { color: var(--muted); text-decoration: none; }
+nav a[aria-current="page"] { color: var(--accent); font-weight: 600; }
+main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 30px; line-height: 1.2; margin: 0 0 4px; }
+.updated { color: var(--muted); margin: 0 0 28px; }
+h2 { font-size: 20px; margin: 32px 0 8px; }
+h3 { font-size: 16px; margin: 20px 0 6px; }
+a { color: var(--accent); }
+ul { padding-left: 22px; }
+li { margin: 4px 0; }
+.summary { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; }
+.summary ul { margin: 6px 0 0; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 8px 0; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+/* Details the site owner must fill in before going live. */
+.fill { background: var(--fill-bg); color: var(--fill-text); padding: 0 4px; border-radius: 3px; font-weight: 600; }
+footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 14px; text-align: center; padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px)); }

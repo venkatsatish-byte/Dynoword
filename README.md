@@ -130,8 +130,16 @@ print, export and share everything, so nobody loses their work.
    Stripe to live mode and replace the two Stripe variables with the live values.
 
 Before taking real payments, Stripe asks for business details and a website with terms of service, a
-privacy policy and a refund/cancellation policy. You are responsible for any sales tax or VAT (Stripe Tax
-can calculate it).
+privacy policy and a refund/cancellation policy. Draft pages are included at `/terms`, `/privacy` and
+`/refunds` (files in `public/legal/`):
+
+1. Replace every highlighted placeholder — your name or business name, postal address, contact email,
+   site address and governing law — and review the wording. They are drafts, not legal advice.
+2. In Stripe, open *Settings → Business → Public details* and enter
+   `https://dynoword.netlify.app/terms`, `/privacy` and `/refunds`.
+   Optionally, under *Settings → Checkout*, require customers to accept your terms.
+
+You are responsible for any sales tax or VAT (Stripe Tax can calculate it).
 
 Run the server-logic tests with `npm test`.
 
