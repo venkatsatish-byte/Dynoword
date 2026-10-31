@@ -1,0 +1,41 @@
+{
+  "name": "dynoword",
+  "version": "1.0.0",
+  "description": "Dynoword — a cross-platform word processor (PWA) for Windows, macOS, iOS and Android",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/venkatsatish-byte/Dynoword.git"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/venkatsatish-byte/Dynoword/issues"
+  },
+  "homepage": "https://github.com/venkatsatish-byte/Dynoword#readme",
+  "dependencies": {
+    "@tiptap/core": "^3.30.6",
+    "@tiptap/extension-highlight": "^3.30.6",
+    "@tiptap/extension-image": "^3.30.6",
+    "@tiptap/extension-list": "^3.30.6",
+    "@tiptap/extension-subscript": "^3.30.6",
+    "@tiptap/extension-superscript": "^3.30.6",
+    "@tiptap/extension-table": "^3.30.6",
+    "@tiptap/extension-text-align": "^3.30.6",
+    "@tiptap/extension-text-style": "^3.30.6",
+    "@tiptap/extensions": "^3.30.6",
+    "@tiptap/pm": "^3.30.6",
+    "@tiptap/starter-kit": "^3.30.6",
+    "docx": "^9.5.1",
+    "lucide": "^0.545.0",
+    "mammoth": "^1.11.0"
+  },
+  "devDependencies": {
+    "vite": "^7.1.12"
+  },
+  "private": true,
+  "type": "module"
+}
