@@ -19,12 +19,12 @@
   </header>
   <main>
     <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: October 31, 2026</p>
+    <p class="updated">Last updated: November 22, 2026</p>
 
     <div class="summary">
       <strong>In short</strong>
       <ul>
-        <li><strong>Your documents never leave your device.</strong> They are stored in your browser, and we don’t receive them.</li>
+        <li><strong>Your documents stay on your device</strong>, unless you subscribe and use cloud sync: then they are also stored with our hosting provider so they reach your other devices. We don’t read them.</li>
         <li>For your account we keep only your email address, a user ID, your trial start date and your Stripe customer ID.</li>
         <li>Stripe handles payments, so we never see your card number.</li>
         <li>We use no ads, no advertising cookies and no analytics, and we don’t sell your data.</li>
@@ -43,17 +43,20 @@
         <tr><td>Email address and a user ID</td><td>To sign you in with an email link and to identify your account</td><td>Contract</td></tr>
         <tr><td>Trial start date</td><td>To give you a 7-day free trial and know when it ends</td><td>Contract</td></tr>
         <tr><td>Stripe customer ID and subscription status</td><td>To link your account to your subscription and unlock editing</td><td>Contract</td></tr>
-        <tr><td>Technical request data (IP address, browser type, time) in server and hosting logs</td><td>To run the service securely and investigate abuse or errors</td><td>Legitimate interests</td></tr>
+        <tr><td>Subscribers using cloud sync: your documents (title, content, page settings, pasted job description, and whether they are in the Recycle Bin)</td><td>To keep your documents up to date on every device where you sign in</td><td>Contract</td></tr>
+<tr><td>Technical request data (IP address, browser type, time) in server and hosting logs</td><td>To run the service securely and investigate abuse or errors</td><td>Legitimate interests</td></tr>
         <tr><td>Emails you send us</td><td>To answer you</td><td>Legitimate interests</td></tr>
       </table>
     </div>
-    <p>We do not collect your documents, your document titles, job descriptions you paste into the ATS check, or
-      anything you type into the editor.</p>
+    <p>Unless you use cloud sync, we do not collect your documents, your document titles, job descriptions you paste
+into the ATS check, or anything you type into the editor. We never read, analyse or share synced documents; they
+are stored only so they can be sent back to your own devices.</p>
 
     <h2>3. What stays on your device</h2>
-    <p>Dynoword stores these in your browser (IndexedDB and local storage) on your own device. They are not sent to us:</p>
+    <p>Dynoword stores these in your browser (IndexedDB and local storage) on your own device. Apart from documents
+synced by subscribers (section 2), they are not sent to us:</p>
     <ul>
-      <li>your documents, their settings and any pasted job descriptions;</li>
+      <li>your documents, their settings and any pasted job descriptions, and a record of which ones have synced;</li>
       <li>preferences such as theme, zoom and whether the ruler is shown;</li>
       <li>your sign-in session (managed by Firebase), a cached copy of your plan status so the app works offline, and while
         you are signing in, the email address the link was sent to.</li>
@@ -66,7 +69,7 @@
     <div class="table-wrap">
       <table>
         <tr><th>Provider</th><th>Purpose</th><th>Data</th></tr>
-        <tr><td>Netlify, Inc. (USA)</td><td>Hosting the website and app, running our server functions, storing account records</td><td>Request logs; email address, user ID, trial date, Stripe customer ID</td></tr>
+        <tr><td>Netlify, Inc. (USA)</td><td>Hosting the website and app, running our server functions, storing account records</td><td>Request logs; email address, user ID, trial date, Stripe customer ID; synced documents</td></tr>
         <tr><td>Google LLC — Firebase Authentication (USA)</td><td>Sending sign-in emails and managing sign-in</td><td>Email address, user ID, sign-in times, IP address</td></tr>
         <tr><td>Stripe, Inc. / Stripe Payments Europe, Ltd.</td><td>Taking payments, managing subscriptions, the billing portal and receipts</td><td>Email, payment card and billing details, payment history</td></tr>
       </table>
@@ -85,7 +88,10 @@
     <h2>6. How long we keep data</h2>
     <ul>
       <li>Account record (email, user ID, trial date, Stripe customer ID): while your account exists, and deleted within 30 days after you ask us to delete your account.</li>
-      <li>Payment and invoice records: kept by Stripe, and by us where needed, for as long as tax and accounting laws require (often 6–10 years).</li>
+      <li>Synced documents: while your account exists. A document you delete forever is removed from cloud storage when
+your device next syncs; a small record of its ID stays so your other devices delete it too. Everything is
+deleted within 30 days after you ask us to delete your account.</li>
+<li>Payment and invoice records: kept by Stripe, and by us where needed, for as long as tax and accounting laws require (often 6–10 years).</li>
       <li>Hosting and function logs: kept by Netlify for a short period under its own retention settings.</li>
     </ul>
 
@@ -98,8 +104,10 @@
 
     <h2>8. Security</h2>
     <p>Connections are encrypted (HTTPS). Sign-in uses one-time links, so there are no passwords to steal. Our server
-      checks every request against a signed sign-in token, and card details are handled only by Stripe. Because your
-      documents are stored on your device, keep your device and its accounts secure.</p>
+      checks every request against a signed sign-in token, and card details are handled only by Stripe. Synced documents
+are kept in storage that only our server functions can reach, and each request can read only the
+documents of the signed-in account that sent it.
+Documents on your device are as safe as the device, so keep it and its accounts secure.</p>
 
     <h2>9. Children</h2>
     <p>Dynoword is not intended for children under 16, and we do not knowingly create accounts for them. If you

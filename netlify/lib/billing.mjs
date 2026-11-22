@@ -34,7 +34,7 @@ export function accessFor(record, subscription, now) {
   return { status: 'expired', until: null, trialEndsAt };
 }
 
-async function loadRecord(user, { store, now }) {
+export async function loadRecord(user, { store, now }) {
   let record = await store.get(user.uid, { type: 'json' });
   if (!record) {
     // The free trial starts the first time someone signs in.
@@ -44,7 +44,7 @@ async function loadRecord(user, { store, now }) {
   return record;
 }
 
-async function activeSubscription(record, stripe) {
+export async function activeSubscription(record, stripe) {
   if (!record.customerId) return null;
   const { data } = await stripe.subscriptions.list({ customer: record.customerId, status: 'all', limit: 10 });
   return data.find((s) => PAID.includes(s.status)) || null;

@@ -30,6 +30,8 @@ export function deps(req) {
   if (!process.env.STRIPE_SECRET_KEY) throw new HttpError(500, 'Payments are not set up yet (missing STRIPE_SECRET_KEY).');
   return {
     store: getStore({ name: 'users', consistency: 'strong' }),
+    docs: getStore({ name: 'docs', consistency: 'strong' }),
+    index: getStore({ name: 'doc-index', consistency: 'strong' }),
     stripe: new Stripe(process.env.STRIPE_SECRET_KEY),
     now: Date.now(),
     priceId: process.env.STRIPE_PRICE_ID,

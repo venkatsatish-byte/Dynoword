@@ -105,6 +105,14 @@ print, export and share everything, so nobody loses their work.
 - Three Netlify Functions in `netlify/functions` check the sign-in token and ask Stripe for the plan:
   `GET /api/account`, `POST /api/checkout`, `POST /api/portal`.
 - Subscribers can keep editing offline using their last known plan.
+- **Cloud sync (subscribers):** documents, including the Recycle Bin, sync between every device where the person
+  signs in. `GET/PUT/DELETE /api/sync` (`netlify/functions/sync.mjs`) store each document in Netlify Blobs with
+  its own revision; an upload based on an older revision is refused, and the app then keeps both versions (the
+  cloud one, plus a "conflict copy" of this device's), so no edit is lost. Uploads need an active subscription
+  (checked with Stripe at most every 10 minutes); lapsed subscribers can still download. Sync runs a few seconds
+  after typing stops, every minute while the app is open, when it comes back online, and from *Account → Sync now*.
+  Documents over about 4.4 MB (usually large pictures) don't sync and are listed in the Account panel. A device
+  that synced with one account pauses sync if another account signs in, until the person chooses otherwise.
 
 **Billing is off until it is configured** — without the settings below the app stays free for everyone.
 

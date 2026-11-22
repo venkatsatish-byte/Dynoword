@@ -21,6 +21,8 @@ import {
   saveDoc, writeDoc, getDoc, listDocs, listTrash, allDocs, trashDoc, restoreDoc, deleteDoc, purgeTrash, protectStorage, newId,
 } from './storage.js';
 import { isTrashed, trashDaysLeft, backupDue, makeBackup, readBackup, planRestore, uniqueNames, BACKUP_FILE } from './safety.js';
+import { runSync } from './sync.js';
+import { readSync, writeSync, markChanged } from './sync-state.js';
 import { readFile, download, safeFilename, standaloneHtml, htmlToMarkdown } from './io.js';
 import { TEMPLATES } from './templates.js';
 import { analyze, matchKeywords, cleanJson, headerParagraphs, insertAfterName, atsDocument } from './ats.js';
@@ -53,6 +55,8 @@ const state = {
   saveTimer: null,
   dictation: null,
 };
+// Cloud sync: 'off', 'full' or 'pull', the last result, and the sync in progress.
+const sync = { mode: 'off', status: { state: 'off' }, running: null, again: false, timer: null };
 
 // ---------- Editor ----------
 
@@ -298,6 +302,8 @@ const commands = {
   subscribe: () => billingAction(billing.subscribe),
   manageBilling: () => billingAction(billing.manageBilling),
   signOut: () => billingAction(billing.signOut),
+  syncNow: () => syncNow(true),
+  syncAdopt: adoptDeviceForSync,
   backup: downloadBackup,
   restoreBackup: () => $('#backupInput').click(),
 };
@@ -328,7 +334,7 @@ const paramCommands = {
 const READ_ONLY_OK = new Set(['openHub', 'closeHub', 'print', 'share', 'copy', 'find', 'closeFind', 'findNext', 'findPrev',
   'wordCount', 'readAloud', 'zoomIn', 'zoomOut', 'zoom', 'layout', 'focus', 'toggleTheme', 'toggleRibbon', 'navPane',
   'showComments', 'atsPane', 'ruler', 'install', 'export', 'account', 'signIn', 'subscribe', 'manageBilling', 'signOut',
-  'backup', 'restoreBackup']);
+  'backup', 'restoreBackup', 'syncNow', 'syncAdopt']);
 
 function run(cmd) {
   closeMenus();
@@ -1258,7 +1264,14 @@ $('#imageInput').addEventListener('change', (e) => { insertImageFiles(e.target.f
 
 // ---------- Documents ----------
 
-function setSaveState(text) { $('#saveState').textContent = text; }
+function setSaveState(text) {
+  state.saveText = text;
+  const cloud = { syncing: 'Syncing…', ok: 'Synced', offline: 'Offline', error: 'Not synced' }[sync.mode === 'full' ? sync.status.state : ''];
+  $('#saveState').textContent = cloud && text === 'Saved' ? `Saved · ${cloud}` : text;
+}
+
+// Everything persist() stores, to tell whether anything changed since the last save.
+const docSignature = (d) => JSON.stringify([d.title, d.content, d.settings, d.jobDescription ?? '']);
 
 function scheduleSave() {
   if (!state.doc) return;
@@ -1272,9 +1285,13 @@ async function persist() {
   if (!state.doc) return;
   state.doc.content = editor.getJSON();
   state.doc.title = $('#docTitle').value.trim() || 'Untitled document';
+  const sig = docSignature(state.doc);
+  if (sig === state.savedSig) { setSaveState('Saved'); return; }
   try {
     await saveDoc(state.doc);
+    state.savedSig = sig;
     setSaveState('Saved');
+    scheduleSync();
   } catch {
     setSaveState('Not saved — storage full');
   }
@@ -1293,6 +1310,8 @@ function loadIntoEditor(doc) {
   applySettings();
   refreshNav();
   refreshComments();
+  // A document that came from storage is saved as it is; a new one still needs its first save.
+  state.savedSig = doc.updated ? docSignature({ ...doc, content: editor.getJSON() }) : null;
   setSaveState('Saved');
   try { localStorage.setItem('dw-last', doc.id); } catch {}
   editor.commands.focus('start');
@@ -1552,7 +1571,7 @@ async function restoreBackup(file) {
   await persist();
   const { write, upToDate } = planRestore(backup.docs, await allDocs());
   try {
-    for (const d of write) await writeDoc(d);
+    for (const d of write) { await writeDoc(d); markChanged(d.id); }
   } catch {
     toast('Not enough storage space to restore');
     return;
@@ -1570,6 +1589,130 @@ $('#backupInput').addEventListener('change', (e) => {
   if (e.target.files[0]) restoreBackup(e.target.files[0]);
   e.target.value = '';
 });
+
+// ---------- Cloud sync (subscribers) ----------
+
+// 'full' for subscribers; 'pull' (download only) for lapsed subscribers who synced before; otherwise off.
+function syncModeFor(a) {
+  if (!billing.BILLING_ENABLED || !a.signedIn) return 'off';
+  if (a.status === 'active' && editable()) return 'full';
+  if (a.status === 'active' || a.status === 'expired') return readSync().owner === billing.userId() ? 'pull' : 'off';
+  return 'off';
+}
+
+function setSyncMode(mode) {
+  if (mode === sync.mode) return;
+  sync.mode = mode;
+  sync.status = { state: mode === 'off' ? 'off' : 'syncing' };
+  setSaveState(state.saveText || 'Saved');
+  if (mode !== 'off') syncNow();
+}
+
+function setSyncStatus(status) {
+  sync.status = status;
+  setSaveState(state.saveText || 'Saved');
+  if (!$('#hub').classList.contains('hidden')) renderAccount();
+}
+
+function scheduleSync(ms = 4000) {
+  clearTimeout(sync.timer);
+  if (sync.mode !== 'off') sync.timer = setTimeout(syncNow, ms);
+}
+
+async function syncNow(manual = false) {
+  clearTimeout(sync.timer);
+  if (sync.mode === 'off') return;
+  if (!navigator.onLine) { setSyncStatus({ ...sync.status, state: 'offline' }); return; }
+  if (sync.running) { sync.again = true; return sync.running; }
+  sync.running = (async () => {
+    setSyncStatus({ ...sync.status, state: 'syncing' });
+    try {
+      await persist();
+      const r = await runSync({
+        request: billing.request, allDocs, writeDoc, deleteDoc, readSync, writeSync,
+        uid: billing.userId(), now: Date.now, newId,
+      }, sync.mode);
+      setSyncStatus({ state: r.notSubscribed ? 'notSubscribed' : 'ok', last: Date.now(), tooLarge: r.tooLarge });
+      if (r.changed.length) await showRemoteChanges(r.changed);
+      if (r.conflicts) toast(`${r.conflicts} document${r.conflicts === 1 ? ' was' : 's were'} edited on two devices — both versions kept`);
+      else if (manual) toast('Synced');
+    } catch (e) {
+      console.warn('Sync failed', e);
+      setSyncStatus(e.code === 'OTHER_ACCOUNT' ? { state: 'otherAccount' }
+        : { ...sync.status, state: navigator.onLine ? 'error' : 'offline', error: e.message });
+    } finally {
+      sync.running = null;
+      if (sync.again) { sync.again = false; scheduleSync(500); }
+    }
+  })();
+  return sync.running;
+}
+
+// Documents changed by another device: refresh the lists, and the open document if it was one of them.
+// Only documents without unsynced edits here are ever replaced, so nothing typed is lost.
+async function showRemoteChanges(ids) {
+  if (state.doc && ids.includes(state.doc.id)) {
+    const doc = await getDoc(state.doc.id);
+    if (doc && !isTrashed(doc)) loadIntoEditor(doc);
+    else {
+      const next = (await listDocs())[0];
+      if (next) loadIntoEditor(await getDoc(next.id));
+      else await newDocument('blank');
+    }
+  }
+  if (!$('#hub').classList.contains('hidden')) await Promise.all([renderRecent(), renderTrash()]);
+}
+
+// The device last synced with another account: sync it with this one instead, after asking.
+async function adoptDeviceForSync() {
+  const body = await dialog('Sync this device with this account?', `
+    <p>The documents on this device will be uploaded to <b>${escapeHtml(state.access.email || 'this account')}</b>,
+    and this account's documents will download here.</p>
+    <p class="muted">If this device is shared, sign out instead, so the two accounts' documents stay apart.</p>`, { okText: 'Sync this device' });
+  if (!body) return;
+  writeSync({ owner: null, docs: {}, purge: {}, last: 0 });
+  syncNow(true);
+}
+
+window.addEventListener('online', () => syncNow());
+setInterval(() => { if (!document.hidden) syncNow(); }, 60_000);
+
+function syncSection() {
+  const a = state.access;
+  const st = sync.status;
+  const time = (t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  let text;
+  let tone = 'ok';
+  let actions = '';
+  if (sync.mode === 'off') {
+    if (a.status !== 'trial' && a.status !== 'expired') return '';
+    text = `Cloud sync keeps your documents up to date on all your devices. It’s included with a subscription (${billing.PRICE}).`;
+    tone = 'muted';
+  } else if (st.state === 'otherAccount') {
+    text = 'This device’s documents sync with a different account, so syncing is paused to keep the two apart.';
+    tone = 'warn';
+    actions = '<button class="txt-btn" data-cmd="syncAdopt">Sync this device with this account</button>';
+  } else if (sync.mode === 'pull' || st.state === 'notSubscribed') {
+    text = 'Your subscription has ended. Documents from the cloud still download here, but changes on this device aren’t uploaded.';
+    tone = 'warn';
+  } else {
+    text = {
+      syncing: 'Syncing…',
+      ok: `On. Your documents are kept up to date on every device where you sign in.${st.last ? ` Last synced at ${time(st.last)}.` : ''}`,
+      offline: 'You’re offline. Changes are saved on this device and sync when you’re back online.',
+      error: `Couldn’t sync just now${st.error ? ` (${st.error})` : ''}. Dynoword will try again.`,
+    }[st.state] || 'On.';
+    if (st.state === 'error' || st.state === 'offline') tone = 'warn';
+  }
+  if (sync.mode !== 'off' && st.state !== 'otherAccount') actions = '<button class="txt-btn" data-cmd="syncNow">Sync now</button>';
+  const large = st.tooLarge?.length
+    ? `<p class="muted tiny">Not synced because ${st.tooLarge.length === 1 ? 'it’s' : 'they’re'} too large (usually large pictures): ${st.tooLarge.map(escapeHtml).join(', ')}.</p>` : '';
+  return `
+    <h3>Cloud sync</h3>
+    <p class="storage-status ${tone}"><i data-lucide="${tone === 'warn' ? 'cloud-alert' : 'cloud'}"></i><span>${escapeHtml(text)}</span></p>
+    ${large}
+    ${actions ? `<div class="account-actions">${actions}</div>` : ''}`;
+}
 
 // ---------- Plan: free trial, subscription, read-only ----------
 
@@ -1629,6 +1772,7 @@ function applyAccess(access) {
   renderPlanBanner();
   renderAccount();
   updateToolbar();
+  setSyncMode(syncModeFor(access));
 }
 
 function renderPlanBanner() {
@@ -1720,10 +1864,12 @@ function renderAccount() {
         : `<button class="primary-btn" data-cmd="subscribe">Subscribe — ${billing.PRICE}</button>`}
       <button class="txt-btn" data-cmd="signOut">Sign out</button>
     </div>
+    ${syncSection()}
     <p class="muted tiny">Payments are handled securely by Stripe. Cancel any time from Manage billing.
       <a href="legal/terms.html" target="_blank" rel="noopener">Terms</a> ·
       <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy</a> ·
       <a href="legal/refunds.html" target="_blank" rel="noopener">Refunds</a></p>`;
+  createIcons({ icons, root: el });
 }
 
 $('#hub').addEventListener('submit', async (e) => {
@@ -1847,7 +1993,7 @@ async function boot() {
   billing.start({ onChange: applyAccess, needEmail: askEmailForLink }).catch((e) => applyAccess({ status: 'error', error: e.message }));
   // Re-check the plan when the app comes back to the foreground (e.g. after paying in another tab).
   document.addEventListener('visibilitychange', async () => {
-    if (!document.hidden && state.access.signedIn) applyAccess(await billing.refresh());
+    if (!document.hidden && state.access.signedIn) { applyAccess(await billing.refresh()); syncNow(); }
   });
 
   // Files opened from the OS ("Open with Dynoword") on installed desktop apps.

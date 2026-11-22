@@ -56,13 +56,22 @@ export function canEdit(access) {
 
 export const daysLeft = (access) => Math.max(0, Math.round((access.until - Date.now()) / DAY));
 
-async function api(path, method = 'GET') {
+/** The signed-in person's account id, or null. */
+export const userId = () => auth?.currentUser?.uid ?? null;
+
+/** Calls one of the /api functions as the signed-in person. Errors carry the HTTP status. */
+export async function request(path, { method = 'GET', body } = {}) {
+  if (!auth?.currentUser) throw Object.assign(new Error('Please sign in.'), { status: 401 });
   const token = await auth.currentUser.getIdToken();
-  const res = await fetch(path, { method, headers: { Authorization: `Bearer ${token}` } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
-  return body;
+  const headers = { Authorization: `Bearer ${token}` };
+  if (body) headers['Content-Type'] = 'application/json';
+  const res = await fetch(path, { method, headers, body });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { status: res.status });
+  return data;
 }
+
+const api = (path, method = 'GET') => request(path, { method });
 
 /** Asks the server for the signed-in user's plan; falls back to the last known plan when offline. */
 export async function refresh() {

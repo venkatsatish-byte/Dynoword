@@ -1,5 +1,6 @@
 // Tiny IndexedDB wrapper for documents, with a localStorage fallback.
 import { isTrashed, trashExpired } from './safety.js';
+import { markChanged, markPurged } from './sync-state.js';
 
 const DB_NAME = 'dynoword';
 const STORE = 'docs';
@@ -32,7 +33,9 @@ const lsIndex = () => { try { return JSON.parse(localStorage.getItem('dw-index')
 
 export async function saveDoc(doc) {
   doc.updated = Date.now();
-  return writeDoc(doc);
+  await writeDoc(doc);
+  markChanged(doc.id);
+  return doc;
 }
 
 // Stores a document as it is, without touching its last-edited time (moving to the Recycle Bin, restoring).
@@ -79,7 +82,9 @@ export async function allDocs() {
 
 export async function trashDoc(id) {
   const doc = await getDoc(id);
-  if (doc) await writeDoc({ ...doc, deleted: Date.now() });
+  if (!doc) return;
+  await writeDoc({ ...doc, deleted: Date.now() });
+  markChanged(id);
 }
 
 export async function restoreDoc(id) {
@@ -87,6 +92,7 @@ export async function restoreDoc(id) {
   if (!doc) return;
   delete doc.deleted;
   await writeDoc(doc);
+  markChanged(id);
 }
 
 // Permanently removes documents that have been in the Recycle Bin for 30 days.
@@ -94,8 +100,9 @@ export async function purgeTrash(now = Date.now()) {
   for (const d of await listTrash()) if (trashExpired(d, now)) await deleteDoc(d.id);
 }
 
-// Permanently removes a document.
-export async function deleteDoc(id) {
+// Permanently removes a document, and from cloud sync too unless the cloud asked for it ({ sync: false }).
+export async function deleteDoc(id, { sync = true } = {}) {
+  if (sync) markPurged(id);
   try {
     await tx('readwrite', (s) => s.delete(id));
   } catch {

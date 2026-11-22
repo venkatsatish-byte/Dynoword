@@ -514,6 +514,8 @@ select {
 .storage-status svg { flex: none; width: 18px; height: 18px; margin-top: 1px; }
 .storage-status.ok svg { color: var(--accent); }
 .storage-status.warn svg { color: #d97706; }
+.storage-status.muted svg { color: var(--muted); }
+.account-body .storage-status { max-width: 560px; }
 .recent-item .icon-btn { flex: none; }
 #emptyTrash { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; }
 #emptyTrash svg { width: 16px; height: 16px; }
