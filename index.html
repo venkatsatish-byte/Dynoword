@@ -481,12 +481,18 @@
       <button data-bs="export"><i data-lucide="download"></i><span>Save a copy</span></button>
       <button data-cmd="print"><i data-lucide="printer"></i><span>Print / PDF</span></button>
       <button data-cmd="share"><i data-lucide="share-2"></i><span>Share</span></button>
+      <button data-bs="trash"><i data-lucide="trash-2"></i><span>Recycle Bin</span></button>
       <button data-bs="account"><i data-lucide="circle-user-round"></i><span>Account</span></button>
       <button data-bs="about"><i data-lucide="info"></i><span>About</span></button>
     </div>
     <div class="bs-main">
       <section data-bs-panel="home" class="active">
         <h2>New</h2>
+        <div class="notice hidden" id="backupNotice" role="status">
+          <i data-lucide="shield-alert"></i>
+          <p>Your browser can clear documents saved on this device, for example when space runs low. Download a backup to keep a copy somewhere safe.</p>
+          <button class="primary-btn" data-cmd="backup"><i data-lucide="archive"></i> Back up now</button>
+        </div>
         <div class="templates" data-templates="doc"></div>
         <h3>Résumés &amp; cover letters <span class="muted small">— single-column layouts that pass the ATS check</span></h3>
         <div class="templates" data-templates="resume"></div>
@@ -511,6 +517,18 @@
           <button data-cmd="export:md"><i data-lucide="hash"></i><div><b>Markdown (.md)</b><span>Plain text with simple formatting</span></div></button>
           <button data-cmd="export:txt"><i data-lucide="type"></i><div><b>Plain text (.txt)</b><span>Text only</span></div></button>
         </div>
+        <h3 id="backupTitle">Back up all documents</h3>
+        <p class="storage-status" id="storageStatus"></p>
+        <div class="export-list" aria-labelledby="backupTitle">
+          <button data-cmd="backup"><i data-lucide="archive"></i><div><b>Download backup (.zip)</b><span id="backupHint">Every document as .docx, plus a backup file Dynoword can restore</span></div></button>
+          <button data-cmd="restoreBackup"><i data-lucide="archive-restore"></i><div><b>Restore from backup</b><span>Adds documents from a Dynoword backup. Newer copies on this device are kept.</span></div></button>
+        </div>
+      </section>
+      <section data-bs-panel="trash">
+        <h2>Recycle Bin</h2>
+        <p class="muted">Deleted documents stay here for 30 days, then they're removed for good.</p>
+        <div class="recent" id="trashList"></div>
+        <button class="txt-btn danger hidden" id="emptyTrash"><i data-lucide="trash-2"></i> Empty Recycle Bin</button>
       </section>
       <section data-bs-panel="account">
         <h2>Account</h2>
@@ -523,7 +541,7 @@
           <li><b>Windows / Mac:</b> open in Edge or Chrome, then choose <i>Install Dynoword</i> from the address bar.</li>
           <li><b>iPhone / iPad:</b> open in Safari, tap <i>Share</i> → <i>Add to Home Screen</i>.</li>
           <li><b>Android:</b> open in Chrome, tap <i>⋮</i> → <i>Install app</i>.</li>
-          <li>Works offline. Documents are stored privately on your device.</li>
+          <li>Works offline. Documents are stored privately on your device. Download a backup from <i>Save a copy</i> to keep them safe.</li>
         </ul>
         <button class="primary-btn hidden" id="installBtn" data-cmd="install"><i data-lucide="download"></i> Install app</button>
         <p class="legal-links">
@@ -563,6 +581,7 @@
     </form>
   </dialog>
 
+  <input type="file" id="backupInput" accept=".zip,.json,application/zip,application/json" hidden />
   <input type="file" id="fileInput" accept=".docx,.html,.htm,.txt,.md,.markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html,text/plain" hidden />
   <input type="file" id="imageInput" accept="image/*" hidden />
   <div class="toast" id="toast" role="status"></div>

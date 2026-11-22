@@ -17,7 +17,10 @@ import { ParagraphFormat, Tab, PageBreak, Comment, Search, WordShortcuts } from 
 import { createRuler, layoutTabs, toDisplay, fromDisplay, UNIT } from './ruler.js';
 import { Pagination, measureBreaks, applyBreaks } from './pagination.js';
 import { PAGE_SIZES, MARGINS, DEFAULT_SETTINGS } from './page.js';
-import { saveDoc, getDoc, listDocs, deleteDoc, newId } from './storage.js';
+import {
+  saveDoc, writeDoc, getDoc, listDocs, listTrash, allDocs, trashDoc, restoreDoc, deleteDoc, purgeTrash, protectStorage, newId,
+} from './storage.js';
+import { isTrashed, trashDaysLeft, backupDue, makeBackup, readBackup, planRestore, uniqueNames, BACKUP_FILE } from './safety.js';
 import { readFile, download, safeFilename, standaloneHtml, htmlToMarkdown } from './io.js';
 import { TEMPLATES } from './templates.js';
 import { analyze, matchKeywords, cleanJson, headerParagraphs, insertAfterName, atsDocument } from './ats.js';
@@ -40,6 +43,7 @@ const SYMBOLS = '© ® ™ § ¶ † ‡ • · … – — ‘ ’ “ ” « �
 
 const state = {
   doc: null,
+  storage: 'unknown', // whether the browser agreed to keep our storage: persisted, denied or unsupported
   zoom: 100,
   textColor: '#b91c1c',
   hlColor: '#fde047',
@@ -294,6 +298,8 @@ const commands = {
   subscribe: () => billingAction(billing.subscribe),
   manageBilling: () => billingAction(billing.manageBilling),
   signOut: () => billingAction(billing.signOut),
+  backup: downloadBackup,
+  restoreBackup: () => $('#backupInput').click(),
 };
 
 const paramCommands = {
@@ -321,7 +327,8 @@ const paramCommands = {
 // Commands that only read, export or change the view, so they work while the document is read-only.
 const READ_ONLY_OK = new Set(['openHub', 'closeHub', 'print', 'share', 'copy', 'find', 'closeFind', 'findNext', 'findPrev',
   'wordCount', 'readAloud', 'zoomIn', 'zoomOut', 'zoom', 'layout', 'focus', 'toggleTheme', 'toggleRibbon', 'navPane',
-  'showComments', 'atsPane', 'ruler', 'install', 'export', 'account', 'signIn', 'subscribe', 'manageBilling', 'signOut']);
+  'showComments', 'atsPane', 'ruler', 'install', 'export', 'account', 'signIn', 'subscribe', 'manageBilling', 'signOut',
+  'backup', 'restoreBackup']);
 
 function run(cmd) {
   closeMenus();
@@ -1406,9 +1413,10 @@ $('#hub').addEventListener('click', async (e) => {
   if (open) return openDoc(open.dataset.open);
   const del = e.target.closest('[data-del]');
   if (del) {
-    const body = await dialog('Delete document?', '<p>This permanently removes the document from this device.</p>', { okText: 'Delete' });
+    const body = await dialog('Delete document?', '<p>It moves to the Recycle Bin, where you can restore it for 30 days.</p>', { okText: 'Delete' });
     if (!body) return;
-    await deleteDoc(del.dataset.del);
+    await persist();
+    await trashDoc(del.dataset.del);
     if (del.dataset.del === state.doc?.id) {
       state.doc = null;
       const docs = await listDocs();
@@ -1416,18 +1424,58 @@ $('#hub').addEventListener('click', async (e) => {
       openHub();
     }
     renderRecent();
+    toast('Moved to the Recycle Bin');
+    return;
+  }
+  const restore = e.target.closest('[data-restore]');
+  if (restore) {
+    await restoreDoc(restore.dataset.restore);
+    await Promise.all([renderTrash(), renderRecent()]);
+    toast('Document restored');
+    return;
+  }
+  const purge = e.target.closest('[data-purge]');
+  if (purge) {
+    const body = await dialog('Delete forever?', '<p>This permanently removes the document from this device. It can’t be undone.</p>', { okText: 'Delete forever' });
+    if (!body) return;
+    await deleteDoc(purge.dataset.purge);
+    renderTrash();
+    return;
+  }
+  if (e.target.closest('#emptyTrash')) {
+    const body = await dialog('Empty the Recycle Bin?', '<p>Every document in the Recycle Bin is permanently removed from this device. This can’t be undone.</p>', { okText: 'Empty Recycle Bin' });
+    if (!body) return;
+    for (const d of await listTrash()) await deleteDoc(d.id);
+    renderTrash();
     return;
   }
   const nav = e.target.closest('[data-bs]');
   if (nav) {
+    if (nav.dataset.bs === 'trash') renderTrash();
     $$('[data-bs]').forEach((b) => b.classList.toggle('active', b === nav));
     $$('[data-bs-panel]').forEach((p) => p.classList.toggle('active', p.dataset.bsPanel === nav.dataset.bs));
   }
 });
 
+async function renderTrash() {
+  const docs = await listTrash();
+  $('#trashList').innerHTML = docs.length ? docs.map((d) => {
+    const left = trashDaysLeft(d);
+    return `
+    <div class="recent-item">
+      <div class="recent-open"><i data-lucide="file-text"></i>
+        <span><b>${escapeHtml(d.title)}</b><small>Deleted ${new Date(d.deleted).toLocaleDateString(undefined, { dateStyle: 'medium' })} · ${left <= 1 ? 'removed within a day' : `removed in ${left} days`}</small></span></div>
+      <button class="icon-btn" data-restore="${escapeAttr(d.id)}" title="Restore" aria-label="Restore ${escapeAttr(d.title)}"><i data-lucide="rotate-ccw"></i></button>
+      <button class="icon-btn" data-purge="${escapeAttr(d.id)}" title="Delete forever" aria-label="Delete ${escapeAttr(d.title)} forever"><i data-lucide="x"></i></button>
+    </div>`;
+  }).join('') : '<p class="muted">The Recycle Bin is empty.</p>';
+  $('#emptyTrash').classList.toggle('hidden', !docs.length);
+  createIcons({ icons, root: $('#hub') });
+}
+
 async function openHub(panel = 'home') {
   await persist();
-  await renderRecent();
+  await Promise.all([renderRecent(), renderTrash(), refreshSafety()]);
   renderAccount();
   $$('[data-bs]').forEach((b) => b.classList.toggle('active', b.dataset.bs === panel));
   $$('[data-bs-panel]').forEach((p) => p.classList.toggle('active', p.dataset.bsPanel === panel));
@@ -1435,6 +1483,93 @@ async function openHub(panel = 'home') {
   layoutTabs($('#hub'));
 }
 function closeHub() { $('#hub').classList.add('hidden'); }
+
+// ---------- Keeping documents safe: storage protection, backup and restore ----------
+
+const lastBackup = () => { try { return +localStorage.getItem('dw-last-backup') || 0; } catch { return 0; } };
+
+async function refreshSafety() {
+  const persisted = state.storage === 'persisted';
+  const status = $('#storageStatus');
+  status.className = `storage-status ${persisted ? 'ok' : 'warn'}`;
+  status.innerHTML = persisted
+    ? '<i data-lucide="shield-check"></i><span>Your browser keeps Dynoword’s documents on this device. A backup still protects you if the device is lost or reset.</span>'
+    : '<i data-lucide="shield-alert"></i><span>Your browser may clear documents saved on this device, for example when space runs low or after a week or more without opening Dynoword. Installing Dynoword as an app helps. Download a backup regularly.</span>';
+  const last = lastBackup();
+  $('#backupHint').textContent = `Every document as .docx, plus a backup file Dynoword can restore. ${last
+    ? `Last backup: ${new Date(last).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}.`
+    : 'No backup yet.'}`;
+  const docCount = (await listDocs()).length;
+  $('#backupNotice').classList.toggle('hidden', !backupDue({ persisted, lastBackup: last, docCount }));
+  createIcons({ icons, root: $('#hub') });
+}
+
+async function downloadBackup() {
+  await persist();
+  toast('Preparing backup…');
+  try {
+    const docs = await allDocs();
+    const [{ default: JSZip }, { exportDocx }] = await Promise.all([import('jszip'), import('./docx-export.js')]);
+    const zip = new JSZip();
+    zip.file(BACKUP_FILE, JSON.stringify(makeBackup(docs)));
+    const live = docs.filter((d) => !isTrashed(d) && d.content);
+    const names = uniqueNames(live.map((d) => d.title), 'docx');
+    let failed = 0;
+    for (const [i, d] of live.entries()) {
+      // The backup file has every document; a .docx copy that can't be made is only a convenience lost.
+      try { zip.file(`Documents/${names[i]}`, await exportDocx(d.content, { ...DEFAULT_SETTINGS, ...d.settings, title: d.title })); }
+      catch (e) { failed++; console.warn('No .docx copy in backup for', d.title, e); }
+    }
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    download(blob, `Dynoword backup ${new Date().toISOString().slice(0, 10)}.zip`);
+    try { localStorage.setItem('dw-last-backup', String(Date.now())); } catch {}
+    toast(`Backed up ${live.length} document${live.length === 1 ? '' : 's'}${failed ? ` (${failed} without a .docx copy)` : ''}`);
+    refreshSafety();
+  } catch (e) {
+    console.error(e);
+    toast('Backup failed');
+  }
+}
+
+async function restoreBackup(file) {
+  let backup;
+  try {
+    let text;
+    if (/\.zip$/i.test(file.name) || file.type === 'application/zip') {
+      const { default: JSZip } = await import('jszip');
+      const entry = (await JSZip.loadAsync(file)).file(BACKUP_FILE);
+      if (!entry) throw new Error('NOT_A_BACKUP');
+      text = await entry.async('string');
+    } else {
+      text = await file.text();
+    }
+    backup = readBackup(text);
+  } catch (e) {
+    console.warn(e);
+    await dialog('Not a Dynoword backup', `<p>“${escapeHtml(file.name)}” isn’t a backup made by Dynoword. To open a single document, use <i>Open</i> instead.</p>`, { cancel: false });
+    return;
+  }
+  await persist();
+  const { write, upToDate } = planRestore(backup.docs, await allDocs());
+  try {
+    for (const d of write) await writeDoc(d);
+  } catch {
+    toast('Not enough storage space to restore');
+    return;
+  }
+  const current = write.find((d) => d.id === state.doc?.id);
+  if (current && !isTrashed(current)) loadIntoEditor(await getDoc(current.id));
+  await Promise.all([renderRecent(), renderTrash(), refreshSafety()]);
+  const parts = [`Restored ${write.length} document${write.length === 1 ? '' : 's'}`];
+  if (upToDate) parts.push(`${upToDate} already up to date`);
+  if (backup.skipped) parts.push(`${backup.skipped} damaged and skipped`);
+  toast(parts.join(' · '));
+}
+
+$('#backupInput').addEventListener('change', (e) => {
+  if (e.target.files[0]) restoreBackup(e.target.files[0]);
+  e.target.value = '';
+});
 
 // ---------- Plan: free trial, subscription, read-only ----------
 
@@ -1697,12 +1832,15 @@ async function boot() {
 
   let doc = null;
   try {
+    await purgeTrash();
     const last = localStorage.getItem('dw-last');
     if (last) doc = await getDoc(last);
-    if (!doc) doc = (await listDocs())[0];
+    if (!doc || isTrashed(doc)) doc = (await listDocs())[0];
   } catch {}
   if (doc) loadIntoEditor(doc);
   else await newDocument('blank');
+
+  protectStorage().then((s) => { state.storage = s; });
 
   applyAccess(state.access);
   handleCheckoutReturn();
